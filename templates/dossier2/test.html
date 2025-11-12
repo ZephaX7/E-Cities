@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Test — Ecities (copie)</title>
+    <style>
+/* --- CSS original collé ici (trimmed for brevity in editor) --- */
+*,
+:before,
+:after {
+  --tw-border-spacing-x: 0;
+  --tw-border-spacing-y: 0;
+  --tw-translate-x: 0;
+  --tw-translate-y: 0;
+  --tw-rotate: 0;
+  --tw-skew-x: 0;
+  --tw-skew-y: 0;
+  --tw-scale-x: 1;
+  --tw-scale-y: 1;
+  --tw-pan-x: ;
+  --tw-pan-y: ;
+  --tw-pinch-zoom: ;
+  --tw-scroll-snap-strictness: proximity;
+  --tw-gradient-from-position: ;
+  --tw-gradient-via-position: ;
+  --tw-gradient-to-position: ;
+  --tw-ordinal: ;
+  --tw-slashed-zero: ;
+  --tw-numeric-figure: ;
+  --tw-numeric-spacing: ;
+  --tw-numeric-fraction: ;
+  --tw-ring-inset: ;
+  --tw-ring-offset-width: 0px;
+  --tw-ring-offset-color: #fff;
+  --tw-ring-color: rgb(59 130 246 / .5);
+  --tw-ring-offset-shadow: 0 0 #0000;
+  --tw-ring-shadow: 0 0 #0000;
+  --tw-shadow: 0 0 #0000;
+  --tw-shadow-colored: 0 0 #0000;
+  --tw-blur: ;
+  --tw-brightness: ;
+  --tw-contrast: ;
+  --tw-grayscale: ;
+  --tw-hue-rotate: ;
+  --tw-invert: ;
+  --tw-saturate: ;
+  --tw-sepia: ;
+  --tw-drop-shadow: ;
+  --tw-backdrop-blur: ;
+  --tw-backdrop-brightness: ;
+  --tw-backdrop-contrast: ;
+  --tw-backdrop-grayscale: ;
+  --tw-backdrop-hue-rotate: ;
+  --tw-backdrop-invert: ;
+  --tw-backdrop-opacity: ;
+  --tw-backdrop-saturate: ;
+  --tw-backdrop-sepia: ;
+  --tw-contain-size: ;
+  --tw-contain-layout: ;
+  --tw-contain-paint: ;
+  --tw-contain-style: 
+}
+/* ... trimmed ... */
+    </style>
+  </head>
+  <body>
+    <div class="topbar">
+      <a class="nav-link" href="#">Accueil</a>
+      <a class="nav-link" href="#">Projets</a>
+      <a class="nav-link" href="#">Contact</a>
+    </div>
+
+    <main class="demo-root">
+      <div class="card max-w-3xl">
+        <h1 class="text-4xl font-bold text-white mb-4">Bienvenue — Ecities (demo)</h1>
+        <p class="text-white/80 mb-6">Entrez votre nom et cliquez sur le bouton pour tester l'interaction JavaScript.</p>
+
+        <label class="block mb-2 text-white/80">Votre nom</label>
+        <input id="nameInput" class="input-field mb-4" type="text" placeholder="Ex: Marie" />
+
+        <div class="flex gap-2">
+          <button id="greetBtn" class="btn-primary">Dire bonjour</button>
+          <button id="clearBtn" class="btn-primary hover:bg-black/70">Effacer</button>
+        </div>
+
+        <p id="greetMsg" class="mt-6 text-white/80" aria-live="polite"></p>
+      </div>
+    </main>
+
+    <script>
+      // Petit script d'interaction
+      const nameInput = document.getElementById('nameInput');
+      const greetBtn = document.getElementById('greetBtn');
+      const clearBtn = document.getElementById('clearBtn');
+      const greetMsg = document.getElementById('greetMsg');
+
+      greetBtn.addEventListener('click', () => {
+        const name = nameInput.value.trim();
+        if (!name) {
+          greetMsg.textContent = 'Veuillez entrer un nom.';
+          greetMsg.classList.add('text-white/80');
+          return;
+        }
+        greetMsg.textContent = `Bonjour, ${name} ! 👋`;
+        greetMsg.classList.add('animate-pulse-glow');
+        setTimeout(() => greetMsg.classList.remove('animate-pulse-glow'), 2000);
+      });
+
+      clearBtn.addEventListener('click', () => {
+        nameInput.value = '';
+        greetMsg.textContent = '';
+        nameInput.focus();
+      });
+    </script>
+  </body>
+</html>
