@@ -14,7 +14,9 @@ const pool = new Pool({
 });
 
 const app = express();
-app.use(cors());
+// Allow configurable origin for production (set ALLOWED_ORIGIN to your frontend URL)
+const allowedOrigin = process.env.ALLOWED_ORIGIN || '*';
+app.use(cors({ origin: allowedOrigin }));
 app.use(express.json());
 
 // Health / test DB route
@@ -33,6 +35,13 @@ app.get('/check-username', async (req, res) => {
   const username = req.query.username;
   if (!username) return res.status(400).json({ error: 'Missing username' });
   try {
+    // Ensure users table exists so availability checks don't fail on a fresh DB
+    await pool.query(`CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      username TEXT UNIQUE NOT NULL,
+      password TEXT NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW()
+    )`);
     const result = await pool.query('SELECT 1 FROM users WHERE username = $1 LIMIT 1', [username]);
     return res.json({ exists: result.rowCount > 0 });
   } catch (err) {

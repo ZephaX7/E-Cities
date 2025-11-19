@@ -1,6 +1,8 @@
 // auth.js - manage account button, login/register modal and calls to backend
 (function(){
-  const API_BASE = 'http://localhost:3000';
+  // Determine API base from meta tag if present, otherwise default to localhost
+  const metaApi = document.querySelector('meta[name="api-base"]');
+  const API_BASE = (metaApi && metaApi.content) ? metaApi.content.replace(/\/$/, '') : 'http://localhost:3000';
 
   function qs(id){ return document.getElementById(id); }
 
