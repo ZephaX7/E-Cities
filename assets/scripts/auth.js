@@ -197,11 +197,79 @@
 
   function toggleAccount(){
     const user = getUser();
-    if(user){ // act as logout
-      clearUser(); updateAccountUI();
+    if(user){ // show styled logout confirmation dropdown
+      createLogoutConfirm();
+      showLogoutConfirm();
       return;
     }
     openModal();
+  }
+
+  /* --- Logout confirm dropdown --- */
+  function createLogoutConfirm(){
+    if(document.getElementById('logoutConfirm')) return;
+    const el = document.createElement('div');
+    el.id = 'logoutConfirm';
+    el.className = 'logout-confirm';
+    el.innerHTML = `
+      <div class="lc-text">${(localStorage.getItem('ecities_lang')==='en')? 'Are you sure you want to log out?' : 'Êtes-vous sûr de vouloir vous déconnecter ?'}</div>
+      <div class="lc-actions">
+        <button class="btn secondary" id="logoutCancel">${(localStorage.getItem('ecities_lang')==='en')? 'Cancel' : 'Annuler'}</button>
+        <button class="btn" id="logoutConfirmBtn">${(localStorage.getItem('ecities_lang')==='en')? 'Log out' : 'Se déconnecter'}</button>
+      </div>
+    `;
+    document.body.appendChild(el);
+    // attach handlers
+    el.querySelector('#logoutCancel').addEventListener('click', hideLogoutConfirm);
+    el.querySelector('#logoutConfirmBtn').addEventListener('click', doLogout);
+    // hide when clicking outside
+    document.addEventListener('click', (e)=>{
+      const btn = qs('accountBtn');
+      if(!btn) return;
+      const conf = document.getElementById('logoutConfirm');
+      if(!conf) return;
+      if(conf.contains(e.target) || btn.contains(e.target)) return;
+      hideLogoutConfirm();
+    });
+    // reposition on resize/scroll
+    window.addEventListener('resize', hideLogoutConfirm);
+    window.addEventListener('scroll', hideLogoutConfirm, true);
+  }
+
+  function showLogoutConfirm(){
+    const btn = qs('accountBtn');
+    const conf = document.getElementById('logoutConfirm');
+    if(!btn || !conf) return;
+    const rect = btn.getBoundingClientRect();
+    // position the dropdown under the button, align right edge and nudge left a bit
+    // set top first and temporarily set left so we can measure width
+    conf.style.top = (window.scrollY + rect.bottom + 8) + 'px';
+    conf.style.left = '0px';
+    conf.classList.add('show');
+    // measure and align the right edge of the dropdown with the button's right edge,
+    // then nudge left to avoid being glued to the page border
+    const confW = conf.offsetWidth || 220;
+    let left = window.scrollX + rect.right - confW;
+    // small extra left padding so it's not flush with the border
+    left = left - 6;
+    // clamp so it never goes off the left or right edge of viewport
+    const minLeft = window.scrollX + 8; // 8px padding from left edge
+    const maxLeft = window.scrollX + document.documentElement.clientWidth - confW - 8;
+    if(left < minLeft) left = minLeft;
+    if(left > maxLeft) left = maxLeft;
+    conf.style.left = left + 'px';
+  }
+
+  function hideLogoutConfirm(){
+    const conf = document.getElementById('logoutConfirm');
+    if(!conf) return;
+    conf.classList.remove('show');
+  }
+
+  function doLogout(){
+    clearUser(); updateAccountUI();
+    hideLogoutConfirm();
+    showBanner((localStorage.getItem('ecities_lang')==='en')? 'Logged out' : 'Déconnecté', 'info', 3000);
   }
 
   // init: attach to accountBtn
