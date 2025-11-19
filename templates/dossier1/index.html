@@ -78,7 +78,7 @@
 
 <footer class="footer">
   <div class="container center">🔗 
-    <a href="https://www.linkedin.com/in/e-cities-230404395/" target="_blank">LinkedIn</a>
+    <a id="linkedinBtn" href="https://www.linkedin.com/in/e-cities-230404395/" target="_blank" rel="noopener noreferrer">LinkedIn</a>
   </div>
 </footer>
 
@@ -176,6 +176,15 @@
 
       // initialize
       applyLang();
+
+      // make LinkedIn link open reliably in a new tab (works even if CSS interferes)
+      const linkedin = document.getElementById('linkedinBtn');
+      if (linkedin) {
+        linkedin.addEventListener('click', function (e) {
+          // ensure a new tab is opened
+          window.open(this.href, '_blank', 'noopener,noreferrer');
+        });
+      }
     </script>
   </body>
 </html>
