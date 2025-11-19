@@ -35,6 +35,34 @@ body{margin:0;font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, '
 
 .btn.primary{width:100%;max-width:800px;margin:1rem auto;display:block}
 
+/* Account button in header */
+.account-btn{background:transparent;border:2px solid rgba(255,212,0,0.12);color:var(--accent);padding:.35rem .75rem;border-radius:999px;font-weight:700;margin-left:1rem;cursor:pointer;min-width:54px;height:36px;display:inline-flex;align-items:center;justify-content:center}
+.account-btn:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(255,212,0,0.06)}
+
+/* Auth modal */
+.auth-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:none;align-items:center;justify-content:center;z-index:1000}
+.auth-overlay.open{display:flex}
+.auth-modal{background:#0b0b0b;border-radius:12px;padding:1.25rem;width:100%;max-width:520px;border:1px solid rgba(255,212,0,0.06)}
+.auth-modal h3{margin:0 0 .5rem;color:var(--accent)}
+.auth-tabs{display:flex;gap:.5rem;margin-bottom:.75rem}
+.auth-tab{flex:1;background:rgba(255,255,255,0.02);padding:.5rem;border-radius:8px;text-align:center;color:var(--muted);cursor:pointer}
+.auth-tab.active{background:var(--accent);color:#000;font-weight:800}
+.auth-form label{display:block;color:var(--muted);margin-bottom:.5rem}
+.auth-form input{width:100%;padding:.6rem;border-radius:8px;border:1px solid rgba(255,212,0,0.08);background:transparent;color:#fff;margin-bottom:.75rem}
+.auth-actions{display:flex;gap:.5rem;justify-content:flex-end;align-items:center}
+.auth-close{background:transparent;border:none;color:var(--muted);cursor:pointer;margin-right:auto}
+.auth-msg{color:#ffd;min-height:1.2rem}
+
+@media (max-width:520px){
+	.auth-modal{padding:.9rem;margin:1rem}
+}
+
+/* bottom page banner for errors / alerts */
+.page-banner{position:fixed;left:12px;right:12px;bottom:12px;z-index:1200;display:flex;align-items:center;justify-content:center;padding:.8rem 1rem;border-radius:10px;box-shadow:0 12px 30px rgba(0,0,0,0.6);transform:translateY(20px);opacity:0;pointer-events:none;transition:transform .28s ease,opacity .28s ease}
+.page-banner.show{transform:translateY(0);opacity:1;pointer-events:auto}
+.page-banner.error{background:rgba(180,20,20,0.95);color:#fff}
+.page-banner.info{background:rgba(40,40,40,0.95);color:#ffd400}
+
 /* Hero actions: center CTA and supporting links */
 .hero-actions{display:flex;flex-direction:column;align-items:center;gap:1rem;margin-top:1.5rem}
 
