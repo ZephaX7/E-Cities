@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import pkg from 'pg';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 
 const { Pool } = pkg;
 
@@ -64,7 +64,7 @@ app.post('/register', async (req, res) => {
       created_at TIMESTAMP DEFAULT NOW()
     )`);
 
-    const hashed = await bcrypt.hash(password, 10);
+    const hashed = bcrypt.hashSync(password, 10);
     const insert = await pool.query(
       'INSERT INTO users (username, password) VALUES ($1, $2) RETURNING id, username, created_at',
       [username, hashed]
@@ -89,7 +89,7 @@ app.post('/login', async (req, res) => {
     if (result.rowCount === 0) return res.status(401).json({ error: 'Invalid credentials' });
 
     const user = result.rows[0];
-    const match = await bcrypt.compare(password, user.password);
+    const match = bcrypt.compareSync(password, user.password);
     if (!match) return res.status(401).json({ error: 'Invalid credentials' });
 
     return res.json({ message: 'Login successful', user: { id: user.id, username: user.username } });
