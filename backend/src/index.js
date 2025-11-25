@@ -99,5 +99,13 @@ app.post('/login', async (req, res) => {
   }
 });
 
-const PORT = 3000;
-app.listen(PORT, () => console.log(`Backend listening on http://localhost:${PORT}`));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Backend listening on port ${PORT}`));
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception', err);
+  // keep process running for Render to capture logs; optionally exit
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled rejection', reason);
+});
