@@ -103,21 +103,36 @@ app.get('/votes/:projectId/check', async (req, res) => {
 // Cast a vote (one vote per user per project). Body: { username, projectId }
 app.post('/vote', async (req, res) => {
   const { username, projectId } = req.body || {};
-  if(!username || !projectId) return res.status(400).json({ error: 'Missing username or projectId' });
+  console.log('/vote called', { username, projectId });
+  if(!username || !projectId) {
+    console.warn('/vote missing fields', { body: req.body });
+    return res.status(400).json({ error: 'Missing username or projectId' });
+  }
+  if(typeof username !== 'string' || typeof projectId !== 'string'){
+    console.warn('/vote invalid types', { body: req.body });
+    return res.status(400).json({ error: 'Invalid payload' });
+  }
   try{
     await ensureVotesTable();
     // find user
     const userRes = await pool.query('SELECT id FROM users WHERE username = $1 LIMIT 1', [username]);
-    if(userRes.rowCount === 0) return res.status(404).json({ error: 'User not found' });
+    if(userRes.rowCount === 0) {
+      console.warn('/vote user not found', username);
+      return res.status(404).json({ error: 'User not found' });
+    }
     const userId = userRes.rows[0].id;
-    const insert = await pool.query('INSERT INTO votes (user_id, project_id) VALUES ($1, $2) RETURNING id, project_id, created_at', [userId, projectId]);
+    try{
+      const insert = await pool.query('INSERT INTO votes (user_id, project_id) VALUES ($1, $2) RETURNING id, project_id, created_at', [userId, projectId]);
+    }catch(dbErr){
+      console.error('/vote insert error', dbErr && dbErr.code ? dbErr.code : dbErr);
+      if(dbErr && dbErr.code === '23505') return res.status(409).json({ error: 'Already voted' });
+      throw dbErr;
+    }
     // return new count
     const countRes = await pool.query('SELECT COUNT(*)::int AS count FROM votes WHERE project_id = $1', [projectId]);
     return res.json({ voted: true, projectId, count: countRes.rows[0].count });
   }catch(err){
     console.error('vote error', err);
-    // unique violation => already voted
-    if(err && err.code === '23505') return res.status(409).json({ error: 'Already voted' });
     return res.status(500).json({ error: 'Server error' });
   }
 });
@@ -125,11 +140,18 @@ app.post('/vote', async (req, res) => {
 // Remove a vote. Body: { username, projectId }
 app.delete('/vote', async (req, res) => {
   const { username, projectId } = req.body || {};
-  if(!username || !projectId) return res.status(400).json({ error: 'Missing username or projectId' });
+  console.log('DELETE /vote called', { username, projectId });
+  if(!username || !projectId){
+    console.warn('DELETE /vote missing fields', { body: req.body });
+    return res.status(400).json({ error: 'Missing username or projectId' });
+  }
   try{
     await ensureVotesTable();
     const userRes = await pool.query('SELECT id FROM users WHERE username = $1 LIMIT 1', [username]);
-    if(userRes.rowCount === 0) return res.status(404).json({ error: 'User not found' });
+    if(userRes.rowCount === 0) {
+      console.warn('DELETE /vote user not found', username);
+      return res.status(404).json({ error: 'User not found' });
+    }
     const userId = userRes.rows[0].id;
     const del = await pool.query('DELETE FROM votes WHERE user_id = $1 AND project_id = $2', [userId, projectId]);
     const countRes = await pool.query('SELECT COUNT(*)::int AS count FROM votes WHERE project_id = $1', [projectId]);
