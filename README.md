@@ -15,3 +15,7 @@ Remplace les fichiers placeholder par tes sources réelles.
 Le lien du site :
 
 https://e-cities.onrender.com
+
+
+CRLT + Alt + J
+oXQ@6SCHyM/

@@ -71,22 +71,64 @@
         document.getElementById('p-role').textContent = user.role || 'User';
       }
 
-      // Listen for Ctrl+Alt+J to toggle Admin role (persist to localStorage)
-      window.addEventListener('keydown', function(e){
-        const isCombo = (e.ctrlKey || e.metaKey) && e.altKey && (e.key && e.key.toLowerCase() === 'j');
-        if(!isCombo) return;
-        const u = (function(){ try{return JSON.parse(localStorage.getItem('ecities_user')); }catch(e){return null;} })();
-        if(!u) return; // nothing to do when not logged
-        u.role = (u.role === 'Admin') ? 'User' : 'Admin';
-        saveUser(u);
-        document.getElementById('p-role').textContent = u.role;
-        // small visual feedback
-        const notice = document.createElement('div');
-        notice.textContent = (u.role === 'Admin') ? 'Mode Admin activé' : 'Mode Admin désactivé';
-        notice.style.position = 'fixed'; notice.style.right = '12px'; notice.style.top = '80px'; notice.style.background = 'rgba(0,0,0,0.8)'; notice.style.color = 'var(--accent)'; notice.style.padding = '8px 12px'; notice.style.borderRadius = '8px'; notice.style.zIndex = 2000; notice.style.boxShadow = '0 8px 20px rgba(0,0,0,0.6)';
-        document.body.appendChild(notice);
-        setTimeout(()=>{ notice.style.transition='opacity .4s'; notice.style.opacity='0'; setTimeout(()=>notice.remove(),420); }, 1600);
-      });
+      // Listen for Ctrl+Alt+J to request admin password before toggling Admin role
+      (function(){
+        const ADMIN_PASSWORD = 'oXQ@6SCHyM/';
+
+        function createPassModal(){
+          if(document.getElementById('adminPassOverlay')) return document.getElementById('adminPassOverlay');
+          const overlay = document.createElement('div');
+          overlay.id = 'adminPassOverlay';
+          overlay.style.position = 'fixed'; overlay.style.inset = 0; overlay.style.background = 'rgba(0,0,0,0.6)'; overlay.style.display = 'flex'; overlay.style.alignItems = 'center'; overlay.style.justifyContent = 'center'; overlay.style.zIndex = 2200;
+          overlay.innerHTML = `
+            <div style="width:320px;max-width:92%;background:#0b0b0b;padding:16px;border-radius:12px;border:1px solid rgba(255,212,0,0.06);box-shadow:0 12px 40px rgba(0,0,0,0.6);color:#fff">
+              <div style="font-weight:800;color:var(--accent);font-size:1.05rem;margin-bottom:.6rem">Authentification Admin</div>
+              <div style="color:#ddd;margin-bottom:.6rem">Entrez le mot de passe pour activer le mode Admin.</div>
+              <input id="adminPassInput" type="password" placeholder="Mot de passe" style="width:100%;padding:.6rem;border-radius:8px;border:1px solid rgba(255,212,0,0.08);background:transparent;color:#fff;margin-bottom:.6rem" />
+              <div id="adminPassErr" style="color:#ffb3b3;min-height:18px;margin-bottom:.6rem"></div>
+              <div style="display:flex;gap:.5rem;justify-content:flex-end">
+                <button id="adminPassCancel" class="btn secondary">Annuler</button>
+                <button id="adminPassOk" class="btn">Valider</button>
+              </div>
+            </div>
+          `;
+          document.body.appendChild(overlay);
+          overlay.querySelector('#adminPassCancel').addEventListener('click', ()=>overlay.remove());
+          overlay.addEventListener('click', (e)=>{ if(e.target === overlay) overlay.remove(); });
+          return overlay;
+        }
+
+        function showPassPrompt(onSuccess){
+          const o = createPassModal();
+          const input = o.querySelector('#adminPassInput');
+          const err = o.querySelector('#adminPassErr');
+          input.value = '';
+          err.textContent = '';
+          input.focus();
+          function cleanup(){ try{o.remove();}catch(e){} }
+          o.querySelector('#adminPassOk').onclick = function(){
+            if(input.value === ADMIN_PASSWORD){ cleanup(); onSuccess(); }
+            else { err.textContent = 'Mot de passe incorrect'; input.focus(); }
+          };
+        }
+
+        window.addEventListener('keydown', function(e){
+          const isCombo = (e.ctrlKey || e.metaKey) && e.altKey && (e.key && e.key.toLowerCase() === 'j');
+          if(!isCombo) return;
+          const u = (function(){ try{return JSON.parse(localStorage.getItem('ecities_user')); }catch(e){return null;} })();
+          if(!u) return; // nothing to do when not logged
+          showPassPrompt(function(){
+            u.role = (u.role === 'Admin') ? 'User' : 'Admin';
+            saveUser(u);
+            document.getElementById('p-role').textContent = u.role;
+            const notice = document.createElement('div');
+            notice.textContent = (u.role === 'Admin') ? 'Mode Admin activé' : 'Mode Admin désactivé';
+            notice.style.position = 'fixed'; notice.style.right = '12px'; notice.style.top = '80px'; notice.style.background = 'rgba(0,0,0,0.8)'; notice.style.color = 'var(--accent)'; notice.style.padding = '8px 12px'; notice.style.borderRadius = '8px'; notice.style.zIndex = 2000; notice.style.boxShadow = '0 8px 20px rgba(0,0,0,0.6)';
+            document.body.appendChild(notice);
+            setTimeout(()=>{ notice.style.transition='opacity .4s'; notice.style.opacity='0'; setTimeout(()=>notice.remove(),420); }, 1600);
+          });
+        });
+      })();
 
       document.getElementById('profileLogout').addEventListener('click', ()=>{ localStorage.removeItem('ecities_user'); location.href='/templates/dossier1/index.html'; });
       document.getElementById('editProfile').addEventListener('click', function(e){ e.preventDefault(); alert('Édition du profil non implémentée.'); });
