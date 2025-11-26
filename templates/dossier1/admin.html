@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Administration — E-cities</title>
+    <link rel="stylesheet" href="../../assets/styles/styles.css">
+    <link rel="icon" href="../../assets/images/favicon.svg" type="image/svg+xml">
+    <link rel="shortcut icon" href="../../assets/images/favicon.svg">
+  </head>
+  <body>
+    <header class="top">
+      <div class="container top-inner">
+        <div class="brand">
+          <img id="brandLogo" src="../../assets/images/logo.png" alt="E-cities logo" />
+          <div class="brand-text">
+            <div class="logo">E-cities</div>
+            <div class="tag">Redécouvrez votre quartier</div>
+          </div>
+        </div>
+        <nav class="nav">
+          <!-- On admin page only one button returning to profile info -->
+          <a id="backToProfile" class="account-btn" href="/templates/dossier1/profile.html">Info</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="container section boxed">
+        <h2 style="color:var(--accent)">Administration</h2>
+        <p style="color:#e9e9e9;margin-top:1rem">en cours de dev</p>
+      </section>
+    </main>
+
+    <script>
+      // prevent access if not admin: redirect to profile/info
+      (function(){
+        try{
+          const u = JSON.parse(localStorage.getItem('ecities_user') || 'null');
+          if(!u || u.role !== 'Admin'){
+            // not admin — redirect back to profile
+            window.location.href = '/templates/dossier1/profile.html';
+          }
+        }catch(e){ window.location.href = '/templates/dossier1/profile.html'; }
+      })();
+    </script>
+  </body>
+</html>

@@ -146,8 +146,8 @@
         // ensure hidden by default
         adminBtn.style.display = 'none';
         adminBtn.addEventListener('click', function(){
-          // placeholder behavior
-          alert('En développement');
+          // navigate to admin page
+          window.location.href = '/templates/dossier1/admin.html';
         });
         if(user && user.role === 'Admin'){
           adminBtn.style.display = 'inline-flex';
