@@ -50,6 +50,84 @@ app.get('/check-username', async (req, res) => {
   }
 });
 
+// Ensure votes table exists helper
+async function ensureVotesTable(){
+  try{
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS votes (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        project_id TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE (user_id, project_id)
+      )
+    `);
+  }catch(err){ console.error('ensureVotesTable error', err); }
+}
+
+// Get vote count for a project
+app.get('/votes/:projectId', async (req, res) => {
+  const projectId = req.params.projectId;
+  if(!projectId) return res.status(400).json({ error: 'Missing projectId' });
+  try{
+    await ensureVotesTable();
+    const result = await pool.query('SELECT COUNT(*)::int AS count FROM votes WHERE project_id = $1', [projectId]);
+    return res.json({ projectId, count: result.rows[0].count });
+  }catch(err){ console.error('get votes error', err); return res.status(500).json({ error: 'Server error' }); }
+});
+
+// Check whether a given username has voted for a project
+app.get('/votes/:projectId/check', async (req, res) => {
+  const projectId = req.params.projectId;
+  const username = req.query.username;
+  if(!projectId || !username) return res.status(400).json({ error: 'Missing projectId or username' });
+  try{
+    await ensureVotesTable();
+    const userRes = await pool.query('SELECT id FROM users WHERE username = $1 LIMIT 1', [username]);
+    if(userRes.rowCount === 0) return res.json({ hasVoted: false });
+    const userId = userRes.rows[0].id;
+    const v = await pool.query('SELECT 1 FROM votes WHERE user_id = $1 AND project_id = $2 LIMIT 1', [userId, projectId]);
+    return res.json({ hasVoted: v.rowCount > 0 });
+  }catch(err){ console.error('check vote error', err); return res.status(500).json({ error: 'Server error' }); }
+});
+
+// Cast a vote (one vote per user per project). Body: { username, projectId }
+app.post('/vote', async (req, res) => {
+  const { username, projectId } = req.body || {};
+  if(!username || !projectId) return res.status(400).json({ error: 'Missing username or projectId' });
+  try{
+    await ensureVotesTable();
+    // find user
+    const userRes = await pool.query('SELECT id FROM users WHERE username = $1 LIMIT 1', [username]);
+    if(userRes.rowCount === 0) return res.status(404).json({ error: 'User not found' });
+    const userId = userRes.rows[0].id;
+    const insert = await pool.query('INSERT INTO votes (user_id, project_id) VALUES ($1, $2) RETURNING id, project_id, created_at', [userId, projectId]);
+    // return new count
+    const countRes = await pool.query('SELECT COUNT(*)::int AS count FROM votes WHERE project_id = $1', [projectId]);
+    return res.json({ voted: true, projectId, count: countRes.rows[0].count });
+  }catch(err){
+    console.error('vote error', err);
+    // unique violation => already voted
+    if(err && err.code === '23505') return res.status(409).json({ error: 'Already voted' });
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Remove a vote. Body: { username, projectId }
+app.delete('/vote', async (req, res) => {
+  const { username, projectId } = req.body || {};
+  if(!username || !projectId) return res.status(400).json({ error: 'Missing username or projectId' });
+  try{
+    await ensureVotesTable();
+    const userRes = await pool.query('SELECT id FROM users WHERE username = $1 LIMIT 1', [username]);
+    if(userRes.rowCount === 0) return res.status(404).json({ error: 'User not found' });
+    const userId = userRes.rows[0].id;
+    const del = await pool.query('DELETE FROM votes WHERE user_id = $1 AND project_id = $2', [userId, projectId]);
+    const countRes = await pool.query('SELECT COUNT(*)::int AS count FROM votes WHERE project_id = $1', [projectId]);
+    return res.json({ removed: del.rowCount > 0, projectId, count: countRes.rows[0].count });
+  }catch(err){ console.error('remove vote error', err); return res.status(500).json({ error: 'Server error' }); }
+});
+
 // Register route (username + password)
 app.post('/register', async (req, res) => {
   const { username, password } = req.body;

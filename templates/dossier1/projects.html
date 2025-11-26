@@ -45,7 +45,7 @@
         <p>Ci-dessous une sélection de projets actifs. Cliquez sur un projet pour voir plus de détails.</p>
 
         <div class="cards projects-cards" style="margin-top:1.5rem">
-          <article class="card project-card">
+          <article class="card project-card" data-project-id="place-centrale">
             <div class="project-media" style="height:160px;background:url('https://images.unsplash.com/photo-1508921912186-1d1a45ebb3c1?q=80&w=1200') center/cover no-repeat;border-radius:8px;margin-bottom:1rem"></div>
             <h3>Revitalisation de la place centrale</h3>
             <p style="color:#ddd;margin:.4rem 0">Date de fin estimée : <strong>15/03/2026</strong></p>
@@ -54,12 +54,13 @@
               <img src="https://images.unsplash.com/photo-1499951360447-b19be8fe80f5?q=80&w=400" alt="avancement" style="height:48px;border-radius:6px;object-fit:cover">
               <img src="https://images.unsplash.com/photo-1467269204594-9661b134dd2b?q=80&w=400" alt="avancement" style="height:48px;border-radius:6px;object-fit:cover">
             </div>
-            <div style="margin-top:1rem">
+            <div style="margin-top:1rem;display:flex;align-items:center;gap:.6rem">
               <button class="btn vote-btn">Voter</button>
+              <span class="vote-count" data-project-id="place-centrale">0</span>
             </div>
           </article>
 
-          <article class="card project-card">
+          <article class="card project-card" data-project-id="piste-cyclable">
             <div class="project-media" style="height:160px;background:url('https://images.unsplash.com/photo-1505842465776-3f3f9b4f3df4?q=80&w=1200') center/cover no-repeat;border-radius:8px;margin-bottom:1rem"></div>
             <h3>Aménagement d'une piste cyclable</h3>
             <p style="color:#ddd;margin:.4rem 0">Date de fin estimée : <strong>01/08/2026</strong></p>
@@ -67,12 +68,13 @@
               <img src="../../assets/pictures/logo.png" alt="avancement" style="height:48px;border-radius:6px;object-fit:cover">
               <img src="https://images.unsplash.com/photo-1520975911012-7a9f9e4a0c2a?q=80&w=400" alt="avancement" style="height:48px;border-radius:6px;object-fit:cover">
             </div>
-            <div style="margin-top:1rem">
+            <div style="margin-top:1rem;display:flex;align-items:center;gap:.6rem">
               <button class="btn vote-btn">Voter</button>
+              <span class="vote-count" data-project-id="piste-cyclable">0</span>
             </div>
           </article>
 
-          <article class="card project-card">
+          <article class="card project-card" data-project-id="jardin-partage">
             <div class="project-media" style="height:160px;background:url('https://images.unsplash.com/photo-1496307042754-b4aa456c4a2d?q=80&w=1200') center/cover no-repeat;border-radius:8px;margin-bottom:1rem"></div>
             <h3>Jardin partagé et compost</h3>
             <p style="color:#ddd;margin:.4rem 0">Date de fin estimée : <strong>30/09/2025</strong></p>
@@ -81,8 +83,9 @@
               <img src="https://images.unsplash.com/photo-1501004318641-b39e6451bec6?q=80&w=400" alt="avancement" style="height:48px;border-radius:6px;object-fit:cover">
               <img src="https://images.unsplash.com/photo-1469474968028-56623f02e42e?q=80&w=400" alt="avancement" style="height:48px;border-radius:6px;object-fit:cover">
             </div>
-            <div style="margin-top:1rem">
+            <div style="margin-top:1rem;display:flex;align-items:center;gap:.6rem">
               <button class="btn vote-btn">Voter</button>
+              <span class="vote-count" data-project-id="jardin-partage">0</span>
             </div>
           </article>
         </div>
@@ -97,14 +100,110 @@
     <script src="../../assets/scripts/i18n.js"></script>
     <script src="../../assets/scripts/auth.js"></script>
     <script>
-      // attach vote button handlers
-      document.addEventListener('DOMContentLoaded', function(){
-        document.querySelectorAll('.vote-btn').forEach(function(b){
-          b.addEventListener('click', function(){
-            alert('vote pris en compte');
+      // Voting: require login, call server API for persistence, fallback to localStorage if API fails
+      (function(){
+        const metaApi = document.querySelector('meta[name="api-base"]');
+        const API_BASE = (metaApi && metaApi.content) ? metaApi.content.replace(/\/$/, '') : 'http://localhost:3000';
+
+        function getLocalVotes(){ try{ return JSON.parse(localStorage.getItem('ecities_votes')||'{}'); }catch(e){ return {}; } }
+        function saveLocalVotes(v){ try{ localStorage.setItem('ecities_votes', JSON.stringify(v)); }catch(e){} }
+        function getUser(){ try{return JSON.parse(localStorage.getItem('ecities_user')); }catch(e){return null;} }
+
+        async function fetchCount(pid){
+          try{
+            const res = await fetch(API_BASE + '/votes/' + encodeURIComponent(pid));
+            if(!res.ok) throw new Error('not ok');
+            const data = await res.json();
+            return data.count || 0;
+          }catch(err){
+            const local = getLocalVotes();
+            return (local[pid] && local[pid].length) || 0;
+          }
+        }
+
+        async function checkVotedOnServer(pid, username){
+          try{
+            const res = await fetch(API_BASE + '/votes/' + encodeURIComponent(pid) + '/check?username=' + encodeURIComponent(username));
+            if(!res.ok) throw new Error('not ok');
+            const data = await res.json();
+            return !!data.hasVoted;
+          }catch(err){
+            const local = getLocalVotes();
+            return (local[pid]||[]).indexOf(username) !== -1;
+          }
+        }
+
+        async function castVote(pid, username){
+          try{
+            const res = await fetch(API_BASE + '/vote', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ username, projectId: pid }) });
+            if(res.status === 409) throw new Error('already');
+            if(!res.ok) throw new Error('server');
+            const data = await res.json();
+            return { success: true, count: data.count };
+          }catch(err){
+            // fallback to local
+            const v = getLocalVotes(); v[pid] = v[pid] || []; if(v[pid].indexOf(username) === -1) v[pid].push(username); saveLocalVotes(v);
+            return { success: true, count: v[pid].length };
+          }
+        }
+
+        async function removeVote(pid, username){
+          try{
+            const res = await fetch(API_BASE + '/vote', { method: 'DELETE', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ username, projectId: pid }) });
+            if(!res.ok) throw new Error('server');
+            const data = await res.json();
+            return { success: true, count: data.count };
+          }catch(err){
+            const v = getLocalVotes(); v[pid] = v[pid] || []; const idx = v[pid].indexOf(username); if(idx !== -1) v[pid].splice(idx,1); saveLocalVotes(v);
+            return { success: true, count: (v[pid]||[]).length };
+          }
+        }
+
+        function setCountEl(pid, count){
+          const el = document.querySelector('.vote-count[data-project-id="' + pid + '"]');
+          if(el) el.textContent = count;
+        }
+
+        document.addEventListener('DOMContentLoaded', function(){
+          document.querySelectorAll('.project-card').forEach(async function(card){
+            const pid = card.getAttribute('data-project-id');
+            const btn = card.querySelector('.vote-btn');
+            const countEl = card.querySelector('.vote-count');
+            if(!btn) return;
+            const user = getUser();
+
+            // initialize count from server (or local fallback)
+            const initialCount = await fetchCount(pid);
+            setCountEl(pid, initialCount);
+
+            // initialize voted state
+            if(user && user.username){
+              const hv = await checkVotedOnServer(pid, user.username);
+              if(hv){ btn.textContent = 'Annuler le vote'; btn.classList.add('voted'); }
+            } else { btn.textContent = 'Voter'; btn.classList.remove('voted'); }
+
+            btn.addEventListener('click', async function(){
+              const curUser = getUser();
+              if(!curUser || !curUser.username){
+                try{ window.EcitiesAuth && window.EcitiesAuth.openModal(); }catch(e){ alert('Veuillez vous connecter pour voter.'); }
+                return;
+              }
+              const username = curUser.username;
+              if(btn.classList.contains('voted')){
+                // remove vote
+                const res = await removeVote(pid, username);
+                if(res.success){ btn.textContent = 'Voter'; btn.classList.remove('voted'); setCountEl(pid, res.count); alert('vote annulé'); }
+                else alert('Impossible d\'annuler le vote');
+              } else {
+                // cast vote
+                const res = await castVote(pid, username);
+                if(res.success){ btn.textContent = 'Annuler le vote'; btn.classList.add('voted'); setCountEl(pid, res.count); alert('vote pris en compte'); }
+                else alert('Impossible de voter');
+              }
+            });
           });
         });
-      });
+      })();
     </script>
   </body>
 </html>
