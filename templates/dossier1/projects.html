@@ -149,7 +149,8 @@
 
         async function removeVote(pid, username){
           try{
-            const res = await fetch(API_BASE + '/vote', { method: 'DELETE', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ username, projectId: pid }) });
+            // use POST /vote/remove for better proxy compatibility
+            const res = await fetch(API_BASE + '/vote/remove', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ username, projectId: pid }) });
             if(!res.ok) throw new Error('server');
             const data = await res.json();
             return { success: true, count: data.count };

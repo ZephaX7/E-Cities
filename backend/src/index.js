@@ -159,6 +159,28 @@ app.delete('/vote', async (req, res) => {
   }catch(err){ console.error('remove vote error', err); return res.status(500).json({ error: 'Server error' }); }
 });
 
+// Remove a vote via POST (compatibility for clients/proxies that strip DELETE bodies)
+app.post('/vote/remove', async (req, res) => {
+  const { username, projectId } = req.body || {};
+  console.log('POST /vote/remove called', { username, projectId });
+  if(!username || !projectId){
+    console.warn('POST /vote/remove missing fields', { body: req.body });
+    return res.status(400).json({ error: 'Missing username or projectId' });
+  }
+  try{
+    await ensureVotesTable();
+    const userRes = await pool.query('SELECT id FROM users WHERE username = $1 LIMIT 1', [username]);
+    if(userRes.rowCount === 0) {
+      console.warn('POST /vote/remove user not found', username);
+      return res.status(404).json({ error: 'User not found' });
+    }
+    const userId = userRes.rows[0].id;
+    const del = await pool.query('DELETE FROM votes WHERE user_id = $1 AND project_id = $2', [userId, projectId]);
+    const countRes = await pool.query('SELECT COUNT(*)::int AS count FROM votes WHERE project_id = $1', [projectId]);
+    return res.json({ removed: del.rowCount > 0, projectId, count: countRes.rows[0].count });
+  }catch(err){ console.error('post remove vote error', err); return res.status(500).json({ error: 'Server error' }); }
+});
+
 // Register route (username + password)
 app.post('/register', async (req, res) => {
   const { username, password } = req.body;
