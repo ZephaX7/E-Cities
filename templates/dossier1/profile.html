@@ -34,20 +34,20 @@
         <h2>Profil utilisateur</h2>
         <div style="display:flex;gap:2rem;align-items:flex-start;margin-top:1rem;flex-wrap:wrap">
           <div style="flex:1;min-width:220px">
-            <div style="background:rgba(255,212,0,0.04);border-radius:12px;padding:1rem;border:1px solid rgba(255,212,0,0.06)">
-              <div style="font-size:0.95rem;color:var(--muted)">Nom de compte</div>
-              <div id="p-username" style="margin-top:.4rem;font-weight:800;color:var(--accent);font-size:1.25rem">—</div>
-              <div style="margin-top:.6rem;color:#ddd">Rôle : <span id="p-role">—</span></div>
-            </div>
+                <div style="background:rgba(255,212,0,0.04);border-radius:12px;padding:1rem;border:1px solid rgba(255,212,0,0.06)">
+                  <div id="profile-account" style="font-size:0.95rem;color:var(--muted)">Nom de compte</div>
+                  <div id="p-username" style="margin-top:.4rem;font-weight:800;color:var(--accent);font-size:1.25rem">—</div>
+                  <div style="margin-top:.6rem;color:#ddd"><span id="profile-role">Rôle</span> : <span id="p-role">—</span></div>
+                </div>
           </div>
 
           <div style="flex:2;min-width:260px">
             <div class="boxed" style="padding:1rem">
-              <h3 style="margin-top:0;color:var(--accent)">Informations</h3>
+              <h3 style="margin-top:0;color:var(--accent)" id="profile-title">Profil utilisateur</h3>
               <p id="p-bio" style="color:#e9e9e9">Aucune information supplémentaire.</p>
               <div style="margin-top:1rem;display:flex;gap:.6rem;align-items:center">
-                <button id="profileLogout" class="btn">Se déconnecter</button>
-                <button id="adminButton" class="btn" style="display:none;margin-left:.5rem">Admin</button>
+                <button id="logout-btn" class="btn">Se déconnecter</button>
+                <button id="admin-btn" class="btn" style="display:none;margin-left:.5rem">Admin</button>
               </div>
             </div>
           </div>

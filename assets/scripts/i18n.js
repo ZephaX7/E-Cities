@@ -25,6 +25,14 @@ const I18N = (function(){
       'projects-title': "Projets Citoyens",
       'projects-lead': "Découvrez les projets en cours portés par les citoyens et la municipalité. Chaque projet indique une date de fin estimée et des images d'avancement.",
       'projects-section-title': "Projets en cours",
+      // profile page
+      'profile-title': 'Profil utilisateur',
+      'profile-account': 'Nom de compte',
+      'profile-role': 'Rôle',
+      'profile-info-none': 'Aucune information supplémentaire.',
+      'profile-not-logged': 'Connectez-vous pour voir les informations de votre profil.',
+      'logout-btn': 'Se déconnecter',
+      'admin-btn': 'Admin',
     },
     en: {
       title: "Let's shape the city of tomorrow together",
@@ -50,6 +58,14 @@ const I18N = (function(){
       'projects-title': "Citizen Projects",
       'projects-lead': "Discover ongoing projects led by citizens and the municipality. Each project shows an estimated end date and progress images.",
       'projects-section-title': "Active projects",
+      // profile page
+      'profile-title': 'User profile',
+      'profile-account': 'Account name',
+      'profile-role': 'Role',
+      'profile-info-none': 'No additional information.',
+      'profile-not-logged': 'Log in to view your profile information.',
+      'logout-btn': 'Log out',
+      'admin-btn': 'Admin',
     }
   };
 
