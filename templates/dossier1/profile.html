@@ -141,7 +141,7 @@
       })();
 
       // show Admin button only for Admin users
-      const adminBtn = document.getElementById('adminButton');
+      const adminBtn = document.getElementById('admin-btn');
       if(adminBtn){
         // ensure hidden by default
         adminBtn.style.display = 'none';
@@ -154,7 +154,10 @@
         }
       }
 
-      document.getElementById('profileLogout').addEventListener('click', ()=>{ localStorage.removeItem('ecities_user'); location.href='/templates/dossier1/index.html'; });
+      const logoutBtnEl = document.getElementById('logout-btn');
+      if(logoutBtnEl){
+        logoutBtnEl.addEventListener('click', ()=>{ localStorage.removeItem('ecities_user'); location.href='/templates/dossier1/index.html'; });
+      }
     </script>
   </body>
 </html>
