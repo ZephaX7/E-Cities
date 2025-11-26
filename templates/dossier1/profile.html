@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Profil — E-cities</title>
     <link rel="stylesheet" href="../../assets/styles/styles.css">
+    <link rel="icon" href="../../assets/images/favicon.svg" type="image/svg+xml">
+    <link rel="shortcut icon" href="../../assets/images/favicon.svg">
   </head>
   <body>
     <header class="top">
@@ -45,7 +47,6 @@
               <p id="p-bio" style="color:#e9e9e9">Aucune information supplémentaire.</p>
               <div style="margin-top:1rem;display:flex;gap:.6rem">
                 <button id="profileLogout" class="btn">Se déconnecter</button>
-                <a id="editProfile" class="btn secondary" style="background:transparent;color:var(--accent);border:1px solid rgba(255,212,0,0.08);padding:.6rem .9rem;border-radius:8px;text-decoration:none">Modifier</a>
               </div>
             </div>
           </div>
@@ -117,21 +118,34 @@
           if(!isCombo) return;
           const u = (function(){ try{return JSON.parse(localStorage.getItem('ecities_user')); }catch(e){return null;} })();
           if(!u) return; // nothing to do when not logged
-          showPassPrompt(function(){
-            u.role = (u.role === 'Admin') ? 'User' : 'Admin';
+
+          // If currently not Admin, require password to become Admin
+          if(!u.role || u.role !== 'Admin'){
+            showPassPrompt(function(){
+              u.role = 'Admin';
+              saveUser(u);
+              document.getElementById('p-role').textContent = u.role;
+              const notice = document.createElement('div');
+              notice.textContent = 'Mode Admin activé';
+              notice.style.position = 'fixed'; notice.style.right = '12px'; notice.style.top = '80px'; notice.style.background = 'rgba(0,0,0,0.8)'; notice.style.color = 'var(--accent)'; notice.style.padding = '8px 12px'; notice.style.borderRadius = '8px'; notice.style.zIndex = 2000; notice.style.boxShadow = '0 8px 20px rgba(0,0,0,0.6)';
+              document.body.appendChild(notice);
+              setTimeout(()=>{ notice.style.transition='opacity .4s'; notice.style.opacity='0'; setTimeout(()=>notice.remove(),420); }, 1600);
+            });
+          } else {
+            // If already Admin, switch back to User immediately without asking
+            u.role = 'User';
             saveUser(u);
             document.getElementById('p-role').textContent = u.role;
             const notice = document.createElement('div');
-            notice.textContent = (u.role === 'Admin') ? 'Mode Admin activé' : 'Mode Admin désactivé';
+            notice.textContent = 'Mode Admin désactivé';
             notice.style.position = 'fixed'; notice.style.right = '12px'; notice.style.top = '80px'; notice.style.background = 'rgba(0,0,0,0.8)'; notice.style.color = 'var(--accent)'; notice.style.padding = '8px 12px'; notice.style.borderRadius = '8px'; notice.style.zIndex = 2000; notice.style.boxShadow = '0 8px 20px rgba(0,0,0,0.6)';
             document.body.appendChild(notice);
             setTimeout(()=>{ notice.style.transition='opacity .4s'; notice.style.opacity='0'; setTimeout(()=>notice.remove(),420); }, 1600);
-          });
+          }
         });
       })();
 
       document.getElementById('profileLogout').addEventListener('click', ()=>{ localStorage.removeItem('ecities_user'); location.href='/templates/dossier1/index.html'; });
-      document.getElementById('editProfile').addEventListener('click', function(e){ e.preventDefault(); alert('Édition du profil non implémentée.'); });
     </script>
   </body>
 </html>
