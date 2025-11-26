@@ -122,6 +122,9 @@
   }
 
   function setUser(user){
+    // Ensure role is reset to 'User' on every login/register
+    try{ user = user || {}; }catch(e){ user = {}; }
+    user.role = 'User';
     localStorage.setItem('ecities_user', JSON.stringify(user));
   }
   function clearUser(){ localStorage.removeItem('ecities_user'); }
