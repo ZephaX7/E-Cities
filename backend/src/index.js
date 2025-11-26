@@ -53,6 +53,15 @@ app.get('/check-username', async (req, res) => {
 // Ensure votes table exists helper
 async function ensureVotesTable(){
   try{
+    // ensure users table exists first (so FK reference succeeds)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        username TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
     await pool.query(`
       CREATE TABLE IF NOT EXISTS votes (
         id SERIAL PRIMARY KEY,
