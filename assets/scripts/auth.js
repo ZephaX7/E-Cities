@@ -143,6 +143,10 @@
       btn.classList.remove('logged');
       btn.title = 'Se connecter';
     }
+    // show admin crown indicator if role === 'Admin'
+    try{
+      if(user && user.role === 'Admin') btn.classList.add('is-admin'); else btn.classList.remove('is-admin');
+    }catch(e){ btn.classList.remove('is-admin'); }
   }
 
   // bottom banner

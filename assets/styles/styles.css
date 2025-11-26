@@ -39,6 +39,22 @@ body{margin:0;font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, '
 .account-btn{background:transparent;border:2px solid rgba(255,212,0,0.12);color:var(--accent);padding:.35rem .75rem;border-radius:999px;font-weight:700;margin-left:1rem;cursor:pointer;min-width:54px;height:36px;display:inline-flex;align-items:center;justify-content:center}
 .account-btn:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(255,212,0,0.06)}
 
+/* Admin crown indicator shown above the account button when user is admin */
+.account-btn.is-admin{position:relative}
+.account-btn.is-admin::after{
+	content: "👑";
+	position:absolute;
+	top:-10px;
+	right:6px;
+	background:var(--accent);
+	color:#000;
+	border-radius:999px;
+	padding:3px 6px;
+	font-size:0.85rem;
+	line-height:1;
+	box-shadow:0 6px 18px rgba(0,0,0,0.2);
+}
+
 /* Logout confirmation dropdown (appears under account button) */
 .logout-confirm{position:absolute;min-width:220px;background:#0b0b0b;border:1px solid rgba(255,212,0,0.08);box-shadow:0 10px 30px rgba(0,0,0,0.6);padding:.6rem;border-radius:10px;color:#fff;z-index:1400;transform-origin:top right;opacity:0;pointer-events:none;transition:opacity .12s ease,transform .12s ease}
 .logout-confirm.show{opacity:1;pointer-events:auto;transform:translateY(6px)}
@@ -108,4 +124,12 @@ body{margin:0;font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, '
 	.cards{grid-template-columns:1fr}
 	.hero h1{font-size:2.2rem}
 }
+
+/* Projects page: two cards per row */
+.projects-cards{grid-template-columns:repeat(2,1fr)}
+@media (max-width:900px){
+  .projects-cards{grid-template-columns:1fr}
+}
+
+.vote-btn{padding:.5rem 1rem;font-weight:700;border-radius:10px}
 
