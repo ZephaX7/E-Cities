@@ -149,14 +149,14 @@
       // show Admin button only for Admin users
       const adminBtn = document.getElementById('adminButton');
       if(adminBtn){
+        // ensure hidden by default
+        adminBtn.style.display = 'none';
+        adminBtn.addEventListener('click', function(){
+          // placeholder behavior
+          alert('En développement');
+        });
         if(user && user.role === 'Admin'){
           adminBtn.style.display = 'inline-flex';
-          adminBtn.addEventListener('click', function(){
-            // placeholder behavior
-            alert('En développement');
-          });
-        } else {
-          adminBtn.style.display = 'none';
         }
       }
 
