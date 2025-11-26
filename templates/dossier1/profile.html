@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Profil utilisateur — E-cities</title>
+    <link rel="stylesheet" href="../../assets/styles/styles.css">
+    <style>
+      .profile{max-width:820px;margin:36px auto;padding:18px;background:#fff;border-radius:12px;box-shadow:0 6px 18px rgba(0,0,0,0.06)}
+      .profile h1{margin-top:0}
+      .profile-row{display:flex;gap:12px;align-items:center}
+      .profile-k{color:#666;width:160px}
+    </style>
+  </head>
+  <body>
+    <header class="top">
+      <div class="container top-inner">
+        <div class="brand">
+          <img id="brandLogo" src="../../assets/images/logo.png" alt="E-cities logo" />
+          <div class="brand-text">
+            <div class="logo">E-cities</div>
+          </div>
+        </div>
+        <nav class="nav">
+          <a href="/templates/dossier1/index.html">Accueil</a>
+          <a href="/templates/dossier1/projects.html">Projets Citoyens</a>
+          <button id="backBtn" class="btn">Retour</button>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <div class="container profile">
+        <h1>Profil utilisateur</h1>
+        <div id="notLogged" style="display:none">
+          <p>Vous n'êtes pas connecté.</p>
+          <p><a href="/templates/dossier1/index.html">Retour</a> ou <button id="openLogin" class="btn">Se connecter</button></p>
+        </div>
+        <div id="profileContent" style="display:none">
+          <div class="profile-row"><div class="profile-k">Nom de compte</div><div id="p-username"></div></div>
+          <div class="profile-row" style="margin-top:.6rem"><div class="profile-k">Autres infos</div><div id="p-other">—</div></div>
+          <div style="margin-top:1rem"><button id="profileLogout" class="btn">Se déconnecter</button></div>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      function getUser(){ try{return JSON.parse(localStorage.getItem('ecities_user'));}catch(e){return null;} }
+      document.getElementById('backBtn').addEventListener('click', ()=>location.href='/templates/dossier1/index.html');
+      const openLogin = document.getElementById('openLogin');
+      if(openLogin) openLogin.addEventListener('click', ()=>{ location.href='/templates/dossier1/index.html'; setTimeout(()=>{ try{ window.EcitiesAuth.openModal(); }catch(e){} }, 200); });
+
+      const user = getUser();
+      if(!user){ document.getElementById('notLogged').style.display = 'block'; }
+      else{
+        document.getElementById('profileContent').style.display = 'block';
+        document.getElementById('p-username').textContent = user.username || '—';
+        if(user.created_at) document.getElementById('p-other').textContent = 'Membre depuis ' + user.created_at;
+        document.getElementById('profileLogout').addEventListener('click', ()=>{ localStorage.removeItem('ecities_user'); location.href='/templates/dossier1/index.html'; });
+      }
+    </script>
+  </body>
+</html>

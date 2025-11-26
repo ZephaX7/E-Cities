@@ -214,6 +214,7 @@
     el.innerHTML = `
       <div class="lc-text">${(localStorage.getItem('ecities_lang')==='en')? 'Are you sure you want to log out?' : 'Êtes-vous sûr de vouloir vous déconnecter ?'}</div>
       <div class="lc-actions">
+        <button class="btn secondary" id="logoutInfo">${(localStorage.getItem('ecities_lang')==='en')? 'Info' : 'Info'}</button>
         <button class="btn secondary" id="logoutCancel">${(localStorage.getItem('ecities_lang')==='en')? 'Cancel' : 'Annuler'}</button>
         <button class="btn" id="logoutConfirmBtn">${(localStorage.getItem('ecities_lang')==='en')? 'Log out' : 'Se déconnecter'}</button>
       </div>
@@ -222,6 +223,11 @@
     // attach handlers
     el.querySelector('#logoutCancel').addEventListener('click', hideLogoutConfirm);
     el.querySelector('#logoutConfirmBtn').addEventListener('click', doLogout);
+      el.querySelector('#logoutInfo').addEventListener('click', function(){
+        hideLogoutConfirm();
+        // navigate to profile page which reads user from localStorage
+        window.location.href = '/templates/dossier1/profile.html';
+      });
     // hide when clicking outside
     document.addEventListener('click', (e)=>{
       const btn = qs('accountBtn');
