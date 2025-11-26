@@ -45,8 +45,9 @@
             <div class="boxed" style="padding:1rem">
               <h3 style="margin-top:0;color:var(--accent)">Informations</h3>
               <p id="p-bio" style="color:#e9e9e9">Aucune information supplémentaire.</p>
-              <div style="margin-top:1rem;display:flex;gap:.6rem">
+              <div style="margin-top:1rem;display:flex;gap:.6rem;align-items:center">
                 <button id="profileLogout" class="btn">Se déconnecter</button>
+                <button id="adminButton" class="btn" style="display:none;margin-left:.5rem">Admin</button>
               </div>
             </div>
           </div>
@@ -144,6 +145,20 @@
           }
         });
       })();
+
+      // show Admin button only for Admin users
+      const adminBtn = document.getElementById('adminButton');
+      if(adminBtn){
+        if(user && user.role === 'Admin'){
+          adminBtn.style.display = 'inline-flex';
+          adminBtn.addEventListener('click', function(){
+            // placeholder behavior
+            alert('En développement');
+          });
+        } else {
+          adminBtn.style.display = 'none';
+        }
+      }
 
       document.getElementById('profileLogout').addEventListener('click', ()=>{ localStorage.removeItem('ecities_user'); location.href='/templates/dossier1/index.html'; });
     </script>
