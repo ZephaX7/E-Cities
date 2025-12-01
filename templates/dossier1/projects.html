@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <!-- API base used by frontend JS; update in production to your backend URL on Render -->
-    <meta name="api-base" content="http://localhost:3000">
+    <meta name="api-base" content="https://e-cities-back.onrender.com">
     <!-- Favicon -->
     <link rel="icon" href="../../assets/images/favicon.svg" type="image/svg+xml">
     <link rel="shortcut icon" href="../../assets/images/favicon.svg">
@@ -109,41 +109,44 @@
         function saveLocalVotes(v){ try{ localStorage.setItem('ecities_votes', JSON.stringify(v)); }catch(e){} }
         function getUser(){ try{return JSON.parse(localStorage.getItem('ecities_user')); }catch(e){return null;} }
 
+        // fetch vote count from server; return { ok:true, count } on success, { ok:false, error } on failure
         async function fetchCount(pid){
           try{
             const res = await fetch(API_BASE + '/votes/' + encodeURIComponent(pid));
-            if(!res.ok) throw new Error('not ok');
+            if(!res.ok){
+              console.warn('fetchCount non-200', res.status, res.statusText);
+              return { ok: false, error: 'server ' + res.status };
+            }
             const data = await res.json();
-            return data.count || 0;
+            return { ok: true, count: data.count || 0 };
           }catch(err){
-            const local = getLocalVotes();
-            return (local[pid] && local[pid].length) || 0;
+            console.error('fetchCount network error', err);
+            return { ok: false, error: 'network' };
           }
         }
 
         async function checkVotedOnServer(pid, username){
           try{
             const res = await fetch(API_BASE + '/votes/' + encodeURIComponent(pid) + '/check?username=' + encodeURIComponent(username));
-            if(!res.ok) throw new Error('not ok');
+            if(!res.ok){ console.warn('checkVotedOnServer non-200', res.status); return { ok:false }; }
             const data = await res.json();
-            return !!data.hasVoted;
-          }catch(err){
-            const local = getLocalVotes();
-            return (local[pid]||[]).indexOf(username) !== -1;
-          }
+            return { ok:true, hasVoted: !!data.hasVoted };
+          }catch(err){ console.error('checkVotedOnServer network error', err); return { ok:false }; }
         }
 
         async function castVote(pid, username){
           try{
             const res = await fetch(API_BASE + '/vote', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ username, projectId: pid }) });
-            if(res.status === 409) throw new Error('already');
-            if(!res.ok) throw new Error('server');
+            if(res.status === 409) return { success:false, error: 'already' };
+            if(!res.ok) return { success:false, error: 'server' };
             const data = await res.json();
             return { success: true, count: data.count };
           }catch(err){
-            // fallback to local
+            console.error('castVote network error', err);
+            // fallback to local but notify the user
             const v = getLocalVotes(); v[pid] = v[pid] || []; if(v[pid].indexOf(username) === -1) v[pid].push(username); saveLocalVotes(v);
-            return { success: true, count: v[pid].length };
+            showLocalFallback('Le serveur de votes est injoignable. Votre vote est enregistré localement et ne sera pas partagé.');
+            return { success: true, count: v[pid].length, fallback:true };
           }
         }
 
@@ -151,13 +154,31 @@
           try{
             // use POST /vote/remove for better proxy compatibility
             const res = await fetch(API_BASE + '/vote/remove', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ username, projectId: pid }) });
-            if(!res.ok) throw new Error('server');
+            if(!res.ok) return { success:false, error:'server' };
             const data = await res.json();
             return { success: true, count: data.count };
           }catch(err){
             const v = getLocalVotes(); v[pid] = v[pid] || []; const idx = v[pid].indexOf(username); if(idx !== -1) v[pid].splice(idx,1); saveLocalVotes(v);
-            return { success: true, count: (v[pid]||[]).length };
+            console.error('removeVote network error', err);
+            showLocalFallback('Le serveur de votes est injoignable. Le retrait du vote est enregistré localement.');
+            return { success: true, count: (v[pid]||[]).length, fallback:true };
           }
+        }
+
+        // show a small banner for fallback / network issues
+        function showLocalFallback(msg){
+          console.warn('FALLBACK:', msg);
+          let b = document.getElementById('projectsBanner');
+          if(!b){
+            b = document.createElement('div');
+            b.id = 'projectsBanner';
+            b.style.position = 'fixed'; b.style.left = '12px'; b.style.right = '12px'; b.style.bottom = '12px'; b.style.padding = '10px 14px';
+            b.style.background = '#333'; b.style.color = '#fff'; b.style.borderRadius = '6px'; b.style.zIndex = 9999; b.style.boxShadow = '0 6px 18px rgba(0,0,0,.35)';
+            document.body.appendChild(b);
+          }
+          b.textContent = msg;
+          b.style.display = 'block';
+          setTimeout(()=>{ if(b) b.style.display = 'none'; }, 8000);
         }
 
         function setCountEl(pid, count){
@@ -174,13 +195,21 @@
             const user = getUser();
 
             // initialize count from server (or local fallback)
-            const initialCount = await fetchCount(pid);
-            setCountEl(pid, initialCount);
+            const fc = await fetchCount(pid);
+            if(fc.ok) setCountEl(pid, fc.count); else {
+              // server unreachable or error -> show local count and banner
+              const local = getLocalVotes(); const localCount = (local[pid] || []).length; setCountEl(pid, localCount);
+              showLocalFallback('Impossible de contacter le serveur de votes — affichage local temporaire.');
+            }
 
             // initialize voted state
             if(user && user.username){
               const hv = await checkVotedOnServer(pid, user.username);
-              if(hv){ btn.textContent = 'Annuler le vote'; btn.classList.add('voted'); }
+              if(hv && hv.ok && hv.hasVoted){ btn.textContent = 'Annuler le vote'; btn.classList.add('voted'); }
+              else {
+                // if server check failed, fall back to local storage
+                if(!hv.ok){ const local = getLocalVotes(); if((local[pid]||[]).indexOf(user.username) !== -1){ btn.textContent = 'Annuler le vote'; btn.classList.add('voted'); } else { btn.textContent='Voter'; btn.classList.remove('voted'); } }
+              }
             } else { btn.textContent = 'Voter'; btn.classList.remove('voted'); }
 
             btn.addEventListener('click', async function(){

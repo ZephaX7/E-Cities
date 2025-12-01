@@ -181,6 +181,16 @@ app.post('/vote/remove', async (req, res) => {
   }catch(err){ console.error('post remove vote error', err); return res.status(500).json({ error: 'Server error' }); }
 });
 
+// Debug status: return vote counts per project (read-only)
+app.get('/debug/status', async (req, res) => {
+  try{
+    await ensureVotesTable();
+    const rows = await pool.query('SELECT project_id, COUNT(*)::int AS count FROM votes GROUP BY project_id');
+    const recent = await pool.query('SELECT v.id, u.username, v.project_id, v.created_at FROM votes v JOIN users u ON u.id = v.user_id ORDER BY v.created_at DESC LIMIT 20');
+    return res.json({ counts: rows.rows, recent: recent.rows });
+  }catch(err){ console.error('debug status error', err); return res.status(500).json({ error: 'Server error' }); }
+});
+
 // Register route (username + password)
 app.post('/register', async (req, res) => {
   const { username, password } = req.body;
