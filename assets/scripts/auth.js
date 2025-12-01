@@ -114,7 +114,11 @@
         setUser(data.user || {username});
       }
       updateAccountUI();
-      setTimeout(()=>closeModal(),700);
+      // close modal then reload page so UI updates across the app
+      setTimeout(()=>{
+        closeModal();
+        try{ window.location.reload(); }catch(e){}
+      },700);
     }catch(err){
       console.error('auth error',err); msgEl.textContent = (localStorage.getItem('ecities_lang')==='en')? 'Network error' : 'Erreur réseau';
       showBanner((localStorage.getItem('ecities_lang')==='en')? 'Network error' : 'Erreur réseau','error');
@@ -283,6 +287,8 @@
     clearUser(); updateAccountUI();
     hideLogoutConfirm();
     showBanner((localStorage.getItem('ecities_lang')==='en')? 'Logged out' : 'Déconnecté', 'info', 3000);
+    // reload page so logged-out state is applied globally
+    setTimeout(()=>{ try{ window.location.reload(); }catch(e){} }, 700);
   }
 
   // init: attach to accountBtn

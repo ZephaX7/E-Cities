@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="api-base" content="https://e-cities-back.onrender.com">
+    <link rel="icon" href="../../assets/images/favicon.svg" type="image/svg+xml">
+    <link rel="shortcut icon" href="../../assets/images/favicon.svg">
+    <title>Visualisation 3D — E-cities</title>
+    <link rel="stylesheet" href="../../assets/styles/styles.css">
+    <style>
+      /* lightweight page-specific styles */
+      .viewer-wrap{width:100%;height:calc(100vh - 92px);display:flex;flex-direction:column}
+      #viewer{flex:1;background:#222;border-radius:8px;margin:1rem}
+      .viewer-controls{display:flex;gap:.6rem;align-items:center;padding:.6rem 1rem}
+      .viewer-info{color:#ddd}
+    </style>
+  </head>
+  <body>
+    <header class="top">
+      <div class="container top-inner">
+        <div class="brand">
+          <img id="brandLogo" src="../../assets/images/logo.png" alt="E-cities logo" />
+          <div class="brand-text">
+            <div class="logo">E-cities</div>
+            <div class="tag">Redécouvrez votre quartier</div>
+          </div>
+        </div>
+        <nav class="nav">
+          <a href="/templates/dossier1/index.html">Accueil</a>
+          <a href="/templates/dossier1/projects.html">Projets Citoyens</a>
+          <a href="/templates/dossier1/visualization.html">Visualisation 3D</a>
+          <a href="/templates/dossier1/index.html#contact">Contact</a>
+          <button id="langBtn" class="lang" aria-pressed="false">FR</button>
+          <button id="accountBtn" class="account-btn" aria-haspopup="dialog" aria-expanded="false">Compte</button>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="container section boxed">
+        <h1>Visualisation 3D</h1>
+        <p class="lead">Espace de visualisation 3D — manipule le modèle avec la souris (rotation / zoom / pan).</p>
+
+        <div class="viewer-wrap">
+          <div class="viewer-controls">
+            <div class="viewer-info">Modèle: Pomme (exemple)</div>
+            <div style="flex:1"></div>
+            <button id="resetView" class="btn">Réinitialiser la vue</button>
+          </div>
+          <div id="viewer"></div>
+        </div>
+
+      </section>
+    </main>
+
+    <script src="../../assets/scripts/i18n.js"></script>
+    <script src="../../assets/scripts/auth.js"></script>
+    <script type="module">
+      import * as THREE from 'https://unpkg.com/three@0.152.2/build/three.module.js';
+      import { OrbitControls } from 'https://unpkg.com/three@0.152.2/examples/jsm/controls/OrbitControls.js';
+
+      const container = document.getElementById('viewer');
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x222222);
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setPixelRatio(window.devicePixelRatio ? window.devicePixelRatio : 1);
+      renderer.setSize(container.clientWidth, container.clientHeight);
+      container.appendChild(renderer.domElement);
+
+      const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+      camera.position.set(0, 1.2, 3);
+
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.08;
+
+      // lights
+      const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.7);
+      hemi.position.set(0, 2, 0);
+      scene.add(hemi);
+      const dir = new THREE.DirectionalLight(0xffffff, 0.8);
+      dir.position.set(5, 10, 7.5);
+      dir.castShadow = true;
+      scene.add(dir);
+
+      // ground
+      const ground = new THREE.Mesh(
+        new THREE.PlaneGeometry(10, 10),
+        new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9, metalness: 0 })
+      );
+      ground.rotation.x = -Math.PI/2;
+      ground.position.y = -0.6;
+      scene.add(ground);
+
+      // Create a simple apple model (sphere + indent + stem + leaf)
+      const appleGroup = new THREE.Group();
+
+      const bodyGeom = new THREE.SphereGeometry(0.6, 64, 64);
+      // slight squash to look like an apple
+      for(let i=0;i<bodyGeom.attributes.position.count;i++){
+        const y = bodyGeom.attributes.position.getY(i);
+        bodyGeom.attributes.position.setY(i, y * (1 - 0.12 * Math.abs(y)));
+      }
+      bodyGeom.computeVertexNormals();
+      const bodyMat = new THREE.MeshStandardMaterial({ color: 0xd32f2f, roughness: 0.5, metalness: 0.1 });
+      const body = new THREE.Mesh(bodyGeom, bodyMat);
+      body.castShadow = true;
+      appleGroup.add(body);
+
+      // indent at top (a small sphere boolean-style simulated with darker material)
+      const indentGeom = new THREE.SphereGeometry(0.16, 32, 32);
+      const indentMat = new THREE.MeshStandardMaterial({ color: 0x7b1f1f, roughness: 0.6 });
+      const indent = new THREE.Mesh(indentGeom, indentMat);
+      indent.position.set(0, 0.5, 0);
+      appleGroup.add(indent);
+
+      // stem
+      const stemGeom = new THREE.CylinderGeometry(0.03, 0.05, 0.4, 12);
+      const stemMat = new THREE.MeshStandardMaterial({ color: 0x5d3a1a });
+      const stem = new THREE.Mesh(stemGeom, stemMat);
+      stem.position.set(0, 0.85, 0);
+      stem.rotation.x = 0.2;
+      appleGroup.add(stem);
+
+      // leaf
+      const leafGeom = new THREE.BoxGeometry(0.4, 0.02, 0.13);
+      const leafMat = new THREE.MeshStandardMaterial({ color: 0x2e7d32 });
+      const leaf = new THREE.Mesh(leafGeom, leafMat);
+      leaf.position.set(0.18, 0.8, 0.16);
+      leaf.rotation.z = 0.5; leaf.rotation.x = 0.1;
+      appleGroup.add(leaf);
+
+      appleGroup.rotation.y = Math.PI;
+      scene.add(appleGroup);
+
+      // responsive
+      window.addEventListener('resize', onWindowResize);
+      function onWindowResize(){
+        const w = container.clientWidth; const h = container.clientHeight;
+        camera.aspect = w / h; camera.updateProjectionMatrix(); renderer.setSize(w,h);
+      }
+
+      // reset view
+      document.getElementById('resetView').addEventListener('click', ()=>{
+        camera.position.set(0,1.2,3); controls.target.set(0,0,0); controls.update();
+      });
+
+      // animate
+      (function animate(){
+        requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+      })();
+
+    </script>
+  </body>
+</html>
