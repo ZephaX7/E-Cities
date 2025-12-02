@@ -38,6 +38,12 @@ const I18N = (function(){
       'profile-not-logged': 'Connectez-vous pour voir les informations de votre profil.',
       'logout-btn': 'Se déconnecter',
       'admin-btn': 'Admin',
+      // tickets
+      'ticket-send': 'Envoyer le ticket',
+      'ticket-title': 'Titre',
+      'ticket-content': 'Contenu',
+      'ticket-sent': 'Ticket envoyé — merci !',
+      'ticket-need-login': 'Veuillez vous connecter pour envoyer un ticket.'
     },
     en: {
       title: "Let's shape the city of tomorrow together",
@@ -76,6 +82,12 @@ const I18N = (function(){
       'profile-not-logged': 'Log in to view your profile information.',
       'logout-btn': 'Log out',
       'admin-btn': 'Admin',
+      // tickets
+      'ticket-send': 'Send ticket',
+      'ticket-title': 'Title',
+      'ticket-content': 'Content',
+      'ticket-sent': 'Ticket sent — thanks!',
+      'ticket-need-login': 'Log in to send a ticket.'
     }
   };
 
