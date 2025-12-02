@@ -54,9 +54,12 @@
               <img src="https://images.unsplash.com/photo-1499951360447-b19be8fe80f5?q=80&w=400" alt="avancement" style="height:48px;border-radius:6px;object-fit:cover">
               <img src="https://images.unsplash.com/photo-1467269204594-9661b134dd2b?q=80&w=400" alt="avancement" style="height:48px;border-radius:6px;object-fit:cover">
             </div>
-            <div style="margin-top:1rem;display:flex;align-items:center;gap:.6rem">
+            <div style="margin-top:1rem;display:flex;flex-direction:column;align-items:flex-start;gap:.4rem">
+              <div class="vote-info">
+                <div class="vote-label">Nombre de votes :</div>
+                <div class="vote-count" data-project-id="place-centrale">0</div>
+              </div>
               <button class="btn vote-btn">Voter</button>
-              <span class="vote-count" data-project-id="place-centrale">0</span>
             </div>
           </article>
 
@@ -68,9 +71,12 @@
               <img src="../../assets/pictures/logo.png" alt="avancement" style="height:48px;border-radius:6px;object-fit:cover">
               <img src="https://images.unsplash.com/photo-1520975911012-7a9f9e4a0c2a?q=80&w=400" alt="avancement" style="height:48px;border-radius:6px;object-fit:cover">
             </div>
-            <div style="margin-top:1rem;display:flex;align-items:center;gap:.6rem">
+            <div style="margin-top:1rem;display:flex;flex-direction:column;align-items:flex-start;gap:.4rem">
+              <div class="vote-info">
+                <div class="vote-label">Nombre de votes :</div>
+                <div class="vote-count" data-project-id="piste-cyclable">0</div>
+              </div>
               <button class="btn vote-btn">Voter</button>
-              <span class="vote-count" data-project-id="piste-cyclable">0</span>
             </div>
           </article>
 
@@ -83,9 +89,12 @@
               <img src="https://images.unsplash.com/photo-1501004318641-b39e6451bec6?q=80&w=400" alt="avancement" style="height:48px;border-radius:6px;object-fit:cover">
               <img src="https://images.unsplash.com/photo-1469474968028-56623f02e42e?q=80&w=400" alt="avancement" style="height:48px;border-radius:6px;object-fit:cover">
             </div>
-            <div style="margin-top:1rem;display:flex;align-items:center;gap:.6rem">
+            <div style="margin-top:1rem;display:flex;flex-direction:column;align-items:flex-start;gap:.4rem">
+              <div class="vote-info">
+                <div class="vote-label">Nombre de votes :</div>
+                <div class="vote-count" data-project-id="jardin-partage">0</div>
+              </div>
               <button class="btn vote-btn">Voter</button>
-              <span class="vote-count" data-project-id="jardin-partage">0</span>
             </div>
           </article>
         </div>
@@ -172,18 +181,44 @@
           if(!b){
             b = document.createElement('div');
             b.id = 'projectsBanner';
-            b.style.position = 'fixed'; b.style.left = '12px'; b.style.right = '12px'; b.style.bottom = '12px'; b.style.padding = '10px 14px';
-            b.style.background = '#333'; b.style.color = '#fff'; b.style.borderRadius = '6px'; b.style.zIndex = 9999; b.style.boxShadow = '0 6px 18px rgba(0,0,0,.35)';
+            b.className = 'page-banner info';
             document.body.appendChild(b);
           }
           b.textContent = msg;
-          b.style.display = 'block';
-          setTimeout(()=>{ if(b) b.style.display = 'none'; }, 8000);
+          b.classList.add('show');
+          setTimeout(()=>{ if(b) b.classList.remove('show'); }, 8000);
+        }
+
+        // site-styled popup for vote confirmations/errors
+        function showVotePopup(message, type='info', autoClose=3800){
+          let p = document.getElementById('siteVotePopup');
+          if(!p){
+            p = document.createElement('div'); p.id = 'siteVotePopup'; p.className = 'site-popup';
+            p.innerHTML = '<div class="sp-row"><div class="sp-icon" aria-hidden>🔔</div><div class="sp-text"></div><button class="sp-close" aria-label="Fermer">✕</button></div>';
+            document.body.appendChild(p);
+            p.querySelector('.sp-close').addEventListener('click', ()=>{ p.classList.remove('show'); });
+          }
+          p.className = 'site-popup ' + (type||'info');
+          p.querySelector('.sp-text').textContent = message;
+          p.classList.add('show');
+          if(autoClose){ clearTimeout(p._t); p._t = setTimeout(()=>{ p.classList.remove('show'); }, autoClose); }
         }
 
         function setCountEl(pid, count){
           const el = document.querySelector('.vote-count[data-project-id="' + pid + '"]');
-          if(el) el.textContent = count;
+          if(!el) return;
+          // update text
+          el.textContent = count;
+          // accessibility
+          el.setAttribute('aria-label', count + ' votes');
+          // small pulse animation to draw attention when value changes
+          el.classList.remove('pulse');
+          // force reflow to restart animation
+          // eslint-disable-next-line no-unused-expressions
+          void el.offsetWidth;
+          el.classList.add('pulse');
+          clearTimeout(el._t);
+          el._t = setTimeout(()=>{ el.classList.remove('pulse'); }, 360);
         }
 
         document.addEventListener('DOMContentLoaded', function(){
@@ -191,6 +226,7 @@
             const pid = card.getAttribute('data-project-id');
             const btn = card.querySelector('.vote-btn');
             const countEl = card.querySelector('.vote-count');
+            const voteInfo = card.querySelector('.vote-info');
             if(!btn) return;
             const user = getUser();
 
@@ -205,30 +241,32 @@
             // initialize voted state
             if(user && user.username){
               const hv = await checkVotedOnServer(pid, user.username);
-              if(hv && hv.ok && hv.hasVoted){ btn.textContent = 'Annuler le vote'; btn.classList.add('voted'); }
+              if(hv && hv.ok && hv.hasVoted){ btn.textContent = 'Annuler le vote'; btn.classList.add('voted'); if(voteInfo) voteInfo.classList.add('voted'); }
               else {
                 // if server check failed, fall back to local storage
-                if(!hv.ok){ const local = getLocalVotes(); if((local[pid]||[]).indexOf(user.username) !== -1){ btn.textContent = 'Annuler le vote'; btn.classList.add('voted'); } else { btn.textContent='Voter'; btn.classList.remove('voted'); } }
+                if(!hv.ok){ const local = getLocalVotes(); if((local[pid]||[]).indexOf(user.username) !== -1){ btn.textContent = 'Annuler le vote'; btn.classList.add('voted'); if(voteInfo) voteInfo.classList.add('voted'); } else { btn.textContent='Voter'; btn.classList.remove('voted'); if(voteInfo) voteInfo.classList.remove('voted'); } }
               }
-            } else { btn.textContent = 'Voter'; btn.classList.remove('voted'); }
+            } else { btn.textContent = 'Voter'; btn.classList.remove('voted'); if(voteInfo) voteInfo.classList.remove('voted'); }
 
             btn.addEventListener('click', async function(){
               const curUser = getUser();
               if(!curUser || !curUser.username){
-                try{ window.EcitiesAuth && window.EcitiesAuth.openModal(); }catch(e){ alert('Veuillez vous connecter pour voter.'); }
+                try{ window.EcitiesAuth && window.EcitiesAuth.openModal(); }catch(e){ showVotePopup(window.EcitiesI18n ? window.EcitiesI18n.t('profile-not-logged') : 'Veuillez vous connecter pour voter.', 'info', 4200); }
                 return;
               }
               const username = curUser.username;
               if(btn.classList.contains('voted')){
                 // remove vote
                 const res = await removeVote(pid, username);
-                if(res.success){ btn.textContent = 'Voter'; btn.classList.remove('voted'); setCountEl(pid, res.count); alert('vote annulé'); }
-                else alert('Impossible d\'annuler le vote');
+                if(res.success){ btn.textContent = 'Voter'; btn.classList.remove('voted'); setCountEl(pid, res.count); showVotePopup(window.EcitiesI18n ? window.EcitiesI18n.t('vote-removed') : 'Vote annulé', 'success'); }
+                else showVotePopup(window.EcitiesI18n ? window.EcitiesI18n.t('vote-remove-failed') : 'Impossible d\'annuler le vote', 'error');
+                if(voteInfo) voteInfo.classList.remove('voted');
               } else {
                 // cast vote
                 const res = await castVote(pid, username);
-                if(res.success){ btn.textContent = 'Annuler le vote'; btn.classList.add('voted'); setCountEl(pid, res.count); alert('vote pris en compte'); }
-                else alert('Impossible de voter');
+                if(res.success){ btn.textContent = 'Annuler le vote'; btn.classList.add('voted'); setCountEl(pid, res.count); showVotePopup(window.EcitiesI18n ? window.EcitiesI18n.t('vote-success') : 'Vote pris en compte', 'success'); }
+                else showVotePopup(window.EcitiesI18n ? window.EcitiesI18n.t('vote-failed') : 'Impossible de voter', 'error');
+                if(res.success && voteInfo) voteInfo.classList.add('voted');
               }
             });
           });

@@ -133,3 +133,23 @@ body{margin:0;font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, '
 
 .vote-btn{padding:.5rem 1rem;font-weight:700;border-radius:10px}
 
+/* vote counter pill */
+.vote-count{display:inline-flex;align-items:center;gap:.45rem;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,0.03);color:var(--muted);border:1px solid rgba(255,255,255,0.04);min-width:44px;justify-content:center;font-weight:700}
+/* removed decorative star — number shown inline after label now */
+.vote-info{display:flex;flex-direction:row;align-items:center;gap:8px}
+.vote-info .vote-label{color:#ddd;font-size:0.95rem;margin:0}
+.vote-info .vote-count{min-width:56px}
+.vote-info.voted .vote-count{background:var(--accent);color:#000;border-color:rgba(0,0,0,0.08)}
+.vote-count.pulse{transform:scale(1.08);transition:transform .18s cubic-bezier(.2,.9,.3,1)}
+
+/* site popup used for vote confirmations */
+.site-popup{position:fixed;left:50%;top:20%;transform:translateX(-50%) translateY(-10px);min-width:280px;max-width:420px;background:#0b0b0b;border:1px solid rgba(255,212,0,0.08);color:#fff;padding:14px 16px;border-radius:12px;box-shadow:0 18px 40px rgba(0,0,0,0.6);z-index:1400;opacity:0;pointer-events:none;transition:transform .18s ease,opacity .18s ease}
+.site-popup.show{opacity:1;pointer-events:auto;transform:translateX(-50%) translateY(0)}
+.site-popup .sp-row{display:flex;gap:12px;align-items:center}
+.site-popup .sp-icon{font-size:1.6rem}
+.site-popup .sp-text{flex:1;color:#e9e9e9}
+.site-popup .sp-close{background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:1.1rem;padding:6px}
+.site-popup.success{border-color:rgba(0,200,100,0.12)}
+.site-popup.info{border-color:rgba(40,40,40,0.12)}
+.site-popup.error{border-color:rgba(200,40,40,0.12)}
+

@@ -25,6 +25,11 @@ const I18N = (function(){
       'projects-title': "Projets Citoyens",
       'projects-lead': "Découvrez les projets en cours portés par les citoyens et la municipalité. Chaque projet indique une date de fin estimée et des images d'avancement.",
       'projects-section-title': "Projets en cours",
+      // vote messages
+      'vote-success': 'Vote pris en compte',
+      'vote-removed': 'Vote annulé',
+      'vote-failed': 'Impossible de voter',
+      'vote-remove-failed': 'Impossible d\'annuler le vote',
       // profile page
       'profile-title': 'Profil utilisateur',
       'profile-account': 'Nom de compte',
@@ -58,6 +63,11 @@ const I18N = (function(){
       'projects-title': "Citizen Projects",
       'projects-lead': "Discover ongoing projects led by citizens and the municipality. Each project shows an estimated end date and progress images.",
       'projects-section-title': "Active projects",
+      // vote messages
+      'vote-success': 'Vote recorded',
+      'vote-removed': 'Vote removed',
+      'vote-failed': 'Unable to cast vote',
+      'vote-remove-failed': 'Unable to remove vote',
       // profile page
       'profile-title': 'User profile',
       'profile-account': 'Account name',
@@ -141,7 +151,9 @@ const I18N = (function(){
   // auto init on DOMContentLoaded
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 
-  return { apply, toggle };
+  function t(key){ const map = translations[lang] || translations.fr; return map[key] || translations.fr[key] || key; }
+
+  return { apply, toggle, t };
 })();
 
 // expose for debugging
