@@ -1,9 +1,60 @@
-    <script type="module">
-      (async function(){
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- API base used by frontend JS; production backend URL -->
+    <meta name="api-base" content="https://e-cities-back.onrender.com">
+    <!-- Favicon -->
+    <link rel="icon" href="../../assets/images/favicon.svg" type="image/svg+xml">
+    <link rel="shortcut icon" href="../../assets/images/favicon.svg">
+    <title>E-cities — Visualisation 3D</title>
+    <link rel="stylesheet" href="../../assets/styles/styles.css">
+    <style>
+      /* page-specific overrides */
+      #viewer{width:100%;height:48vh;background:#222;border-radius:6px;overflow:hidden}
+      .viz-actions{display:flex;gap:8px;align-items:center;margin-top:12px}
+    </style>
+  </head>
+  <body>
+    <header class="top">
+      <div class="container top-inner">
+        <div class="brand">
+          <img id="brandLogo" src="../../assets/images/logo.png" alt="E-cities logo" />
+          <div class="brand-text">
+            <div class="logo">E-cities</div>
+            <div class="tag">Redécouvrez votre quartier</div>
+          </div>
+        </div>
+        <nav class="nav">
+          <a href="/templates/dossier1/index.html">Accueil</a>
+          <a href="/templates/dossier1/projects.html">Projets Citoyens</a>
+          <a href="/templates/dossier1/visualization.html">Visualisation 3D</a>
+          <a href="/templates/dossier1/index.html#contact">Contact</a>
+          <button id="langBtn" class="lang" aria-pressed="false">FR</button>
+          <button id="accountBtn" class="account-btn" aria-haspopup="dialog" aria-expanded="false">Compte</button>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="container section boxed">
+        <h2 class="center">Visualisation 3D</h2>
+        <div id="viewer" role="application" aria-label="3D viewer"></div>
+        <div class="viz-actions">
+          <button id="resetView" class="btn">Réinitialiser la vue</button>
+        </div>
+      </section>
+    </main>
+
+    <!-- Load from jsDelivr (serves correct MIME types) and init after DOM ready -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
+    <!-- no OrbitControls (blocked on some hosts). Use lightweight custom controls below -->
+    <script>
+      document.addEventListener('DOMContentLoaded', function(){
         const container = document.getElementById('viewer');
         function showError(msg){
           console.error('3D error:', msg);
-          // show a visible message in the viewer area
           container.innerHTML = '';
           const el = document.createElement('div');
           el.style.color = '#fff'; el.style.padding = '1rem'; el.style.fontSize = '16px';
@@ -12,148 +63,80 @@
         }
 
         try{
-          const THREE = await import('https://unpkg.com/three@0.152.2/build/three.module.js');
-          const ctl = await import('https://unpkg.com/three@0.152.2/examples/jsm/controls/OrbitControls.js');
-          const OrbitControls = ctl.OrbitControls;
+          // WebGL check
+          try{ const canvas = document.createElement('canvas'); const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl'); if(!gl) return showError('WebGL non disponible dans ce navigateur.'); }catch(e){ return showError('Impossible de créer un contexte WebGL.'); }
 
-          // quick WebGL availability check
-          try{
-            const canvas = document.createElement('canvas');
-            const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-            if(!gl) return showError('WebGL non disponible dans ce navigateur.');
-          }catch(e){ return showError('Impossible de créer un contexte WebGL.'); }
+          const scene = new THREE.Scene(); scene.background = new THREE.Color(0x222222);
+          const renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); container.appendChild(renderer.domElement);
+          const camera = new THREE.PerspectiveCamera(45, 2, 0.1, 1000); camera.position.set(0,1.2,3);
+          if(typeof THREE.OrbitControls === 'undefined' && typeof OrbitControls === 'function'){
+            // some builds expose OrbitControls as global OrbitControls
+            THREE.OrbitControls = OrbitControls;
+          }
+          // Simple custom controls: drag to rotate model, wheel to zoom, pinch/touch support
+          let dragging = false, lastX = 0, lastY = 0;
+          let rotX = 0, rotY = 0;
+          const minZoom = 1.0, maxZoom = 10.0;
 
-          const scene = new THREE.Scene();
-          scene.background = new THREE.Color(0x222222);
+          function onPointerDown(e){
+            dragging = true; lastX = e.clientX; lastY = e.clientY; container.setPointerCapture && container.setPointerCapture(e.pointerId);
+          }
+          function onPointerMove(e){
+            if(!dragging) return;
+            const dx = e.clientX - lastX; const dy = e.clientY - lastY;
+            lastX = e.clientX; lastY = e.clientY;
+            // rotate appleGroup
+            rotY -= dx * 0.01; rotX -= dy * 0.01;
+            rotX = Math.max(-Math.PI/2, Math.min(Math.PI/2, rotX));
+            appleGroup.rotation.x = rotX; appleGroup.rotation.y = rotY;
+          }
+          function onPointerUp(e){ dragging = false; try{ container.releasePointerCapture && container.releasePointerCapture(e.pointerId);}catch(e){}
+          }
 
-          const renderer = new THREE.WebGLRenderer({ antialias: true });
-          renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-          container.appendChild(renderer.domElement);
+          function onWheel(e){
+            e.preventDefault(); const delta = e.deltaY * 0.01; let z = camera.position.z + delta; z = Math.max(minZoom, Math.min(maxZoom, z)); camera.position.z = z; }
 
-          const camera = new THREE.PerspectiveCamera(45, 2, 0.1, 1000);
-          camera.position.set(0, 1.2, 3);
+          // touch pinch to zoom
+          let lastDist = 0;
+          function getTouchDist(t){ if(t.length<2) return 0; const dx = t[0].clientX - t[1].clientX; const dy = t[0].clientY - t[1].clientY; return Math.hypot(dx,dy); }
+          function onTouchStart(e){ if(e.touches && e.touches.length===1){ lastX = e.touches[0].clientX; lastY = e.touches[0].clientY; } else if(e.touches && e.touches.length===2){ lastDist = getTouchDist(e.touches); } }
+          function onTouchMove(e){ if(e.touches && e.touches.length===1 && !lastDist){ const dx = e.touches[0].clientX - lastX; const dy = e.touches[0].clientY - lastY; lastX = e.touches[0].clientX; lastY = e.touches[0].clientY; rotY -= dx * 0.01; rotX -= dy * 0.01; rotX = Math.max(-Math.PI/2, Math.min(Math.PI/2, rotX)); appleGroup.rotation.x = rotX; appleGroup.rotation.y = rotY; } else if(e.touches && e.touches.length===2){ const d = getTouchDist(e.touches); if(lastDist){ const diff = lastDist - d; camera.position.z = Math.max(minZoom, Math.min(maxZoom, camera.position.z + diff*0.01)); } lastDist = d; } e.preventDefault(); }
+          function onTouchEnd(e){ if(e.touches && e.touches.length<2) lastDist = 0; }
 
-          const controls = new OrbitControls(camera, renderer.domElement);
-          controls.enableDamping = true;
-          controls.dampingFactor = 0.08;
+          container.addEventListener('pointerdown', onPointerDown);
+          window.addEventListener('pointermove', onPointerMove);
+          window.addEventListener('pointerup', onPointerUp);
+          container.addEventListener('wheel', onWheel, { passive: false });
+          container.addEventListener('touchstart', onTouchStart, { passive: false });
+          container.addEventListener('touchmove', onTouchMove, { passive: false });
+          container.addEventListener('touchend', onTouchEnd);
 
-          // lights
-          const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.7);
-          hemi.position.set(0, 2, 0);
-          scene.add(hemi);
-          const dir = new THREE.DirectionalLight(0xffffff, 0.8);
-          dir.position.set(5, 10, 7.5);
-          dir.castShadow = true;
-          scene.add(dir);
+          const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.7); hemi.position.set(0,2,0); scene.add(hemi);
+          const dir = new THREE.DirectionalLight(0xffffff, 0.8); dir.position.set(5,10,7.5); dir.castShadow = true; scene.add(dir);
 
-          // ground
-          const ground = new THREE.Mesh(
-            new THREE.PlaneGeometry(10, 10),
-            new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9, metalness: 0 })
-          );
-          ground.rotation.x = -Math.PI/2;
-          ground.position.y = -0.6;
-          scene.add(ground);
+          const ground = new THREE.Mesh(new THREE.PlaneGeometry(10,10), new THREE.MeshStandardMaterial({ color:0x111111, roughness:0.9 })); ground.rotation.x = -Math.PI/2; ground.position.y = -0.6; scene.add(ground);
 
-          // Create apple model
+          // apple
           const appleGroup = new THREE.Group();
           const bodyGeom = new THREE.SphereGeometry(0.6, 64, 64);
-          for(let i=0;i<bodyGeom.attributes.position.count;i++){
-            const y = bodyGeom.attributes.position.getY(i);
-            bodyGeom.attributes.position.setY(i, y * (1 - 0.12 * Math.abs(y)));
-          }
+          for(let i=0;i<bodyGeom.attributes.position.count;i++){ const y = bodyGeom.attributes.position.getY(i); bodyGeom.attributes.position.setY(i, y * (1 - 0.12 * Math.abs(y))); }
           bodyGeom.computeVertexNormals();
-          const bodyMat = new THREE.MeshStandardMaterial({ color: 0xd32f2f, roughness: 0.5, metalness: 0.1 });
-          const body = new THREE.Mesh(bodyGeom, bodyMat); body.castShadow = true; appleGroup.add(body);
-          const indent = new THREE.Mesh(new THREE.SphereGeometry(0.16, 32, 32), new THREE.MeshStandardMaterial({ color: 0x7b1f1f, roughness: 0.6 })); indent.position.set(0,0.5,0); appleGroup.add(indent);
+          const body = new THREE.Mesh(bodyGeom, new THREE.MeshStandardMaterial({ color:0xd32f2f, roughness:0.5, metalness:0.1 })); body.castShadow = true; appleGroup.add(body);
+          const indent = new THREE.Mesh(new THREE.SphereGeometry(0.16,32,32), new THREE.MeshStandardMaterial({ color:0x7b1f1f, roughness:0.6 })); indent.position.set(0,0.5,0); appleGroup.add(indent);
           const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.05,0.4,12), new THREE.MeshStandardMaterial({ color:0x5d3a1a })); stem.position.set(0,0.85,0); stem.rotation.x = 0.2; appleGroup.add(stem);
           const leaf = new THREE.Mesh(new THREE.BoxGeometry(0.4,0.02,0.13), new THREE.MeshStandardMaterial({ color:0x2e7d32 })); leaf.position.set(0.18,0.8,0.16); leaf.rotation.z = 0.5; leaf.rotation.x = 0.1; appleGroup.add(leaf);
           appleGroup.rotation.y = Math.PI; scene.add(appleGroup);
 
-          // responsive
-          function onWindowResize(){
-            const w = container.clientWidth; const h = container.clientHeight || 400; // fallback
-            camera.aspect = w / h; camera.updateProjectionMatrix(); renderer.setSize(w,h);
-          }
-          window.addEventListener('resize', onWindowResize);
-          // initial resize
-          onWindowResize();
+          function onWindowResize(){ const w = container.clientWidth; const h = container.clientHeight || 400; camera.aspect = w/h; camera.updateProjectionMatrix(); renderer.setSize(w,h); }
+          window.addEventListener('resize', onWindowResize); onWindowResize();
+          document.getElementById('resetView').addEventListener('click', ()=>{ camera.position.set(0,1.2,3); rotX = 0; rotY = Math.PI; appleGroup.rotation.x = rotX; appleGroup.rotation.y = rotY; });
 
-          document.getElementById('resetView').addEventListener('click', ()=>{ camera.position.set(0,1.2,3); controls.target.set(0,0,0); controls.update(); });
+          (function animate(){ requestAnimationFrame(animate); camera.lookAt(0,0,0); renderer.render(scene, camera); })();
 
-          // animate
-          (function animate(){ requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); })();
-
-        }catch(err){
-          console.error('Failed to initialize 3D viewer', err);
-          showError('Impossible de charger la visualisation 3D — vérifie la console pour plus d\'infos.');
-        }
+        }catch(err){ console.error('Failed to init 3D', err); showError('Impossible de charger la visualisation 3D — voir console.'); }
       })();
     </script>
-      ground.rotation.x = -Math.PI/2;
-      ground.position.y = -0.6;
-      scene.add(ground);
-
-      // Create a simple apple model (sphere + indent + stem + leaf)
-      const appleGroup = new THREE.Group();
-
-      const bodyGeom = new THREE.SphereGeometry(0.6, 64, 64);
-      // slight squash to look like an apple
-      for(let i=0;i<bodyGeom.attributes.position.count;i++){
-        const y = bodyGeom.attributes.position.getY(i);
-        bodyGeom.attributes.position.setY(i, y * (1 - 0.12 * Math.abs(y)));
-      }
-      bodyGeom.computeVertexNormals();
-      const bodyMat = new THREE.MeshStandardMaterial({ color: 0xd32f2f, roughness: 0.5, metalness: 0.1 });
-      const body = new THREE.Mesh(bodyGeom, bodyMat);
-      body.castShadow = true;
-      appleGroup.add(body);
-
-      // indent at top (a small sphere boolean-style simulated with darker material)
-      const indentGeom = new THREE.SphereGeometry(0.16, 32, 32);
-      const indentMat = new THREE.MeshStandardMaterial({ color: 0x7b1f1f, roughness: 0.6 });
-      const indent = new THREE.Mesh(indentGeom, indentMat);
-      indent.position.set(0, 0.5, 0);
-      appleGroup.add(indent);
-
-      // stem
-      const stemGeom = new THREE.CylinderGeometry(0.03, 0.05, 0.4, 12);
-      const stemMat = new THREE.MeshStandardMaterial({ color: 0x5d3a1a });
-      const stem = new THREE.Mesh(stemGeom, stemMat);
-      stem.position.set(0, 0.85, 0);
-      stem.rotation.x = 0.2;
-      appleGroup.add(stem);
-
-      // leaf
-      const leafGeom = new THREE.BoxGeometry(0.4, 0.02, 0.13);
-      const leafMat = new THREE.MeshStandardMaterial({ color: 0x2e7d32 });
-      const leaf = new THREE.Mesh(leafGeom, leafMat);
-      leaf.position.set(0.18, 0.8, 0.16);
-      leaf.rotation.z = 0.5; leaf.rotation.x = 0.1;
-      appleGroup.add(leaf);
-
-      appleGroup.rotation.y = Math.PI;
-      scene.add(appleGroup);
-
-      // responsive
-      window.addEventListener('resize', onWindowResize);
-      function onWindowResize(){
-        const w = container.clientWidth; const h = container.clientHeight;
-        camera.aspect = w / h; camera.updateProjectionMatrix(); renderer.setSize(w,h);
-      }
-
-      // reset view
-      document.getElementById('resetView').addEventListener('click', ()=>{
-        camera.position.set(0,1.2,3); controls.target.set(0,0,0); controls.update();
-      });
-
-      // animate
-      (function animate(){
-        requestAnimationFrame(animate);
-        controls.update();
-        renderer.render(scene, camera);
-      })();
-
-    </script>
+    <script src="../../assets/scripts/i18n.js"></script>
+    <script src="../../assets/scripts/auth.js"></script>
   </body>
 </html>
