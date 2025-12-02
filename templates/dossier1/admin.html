@@ -54,11 +54,19 @@
 
         async function fetchTickets(){
           try{
-            const res = await fetch(API_BASE + '/tickets?username=' + encodeURIComponent(user.username));
-            if(!res.ok){ listEl.textContent = 'Erreur lors du chargement des tickets'; return; }
+            const url = API_BASE + '/tickets?username=' + encodeURIComponent(user.username);
+            const res = await fetch(url);
+            if(!res.ok){
+              // try to read response body for more info
+              let bodyText = '';
+              try{ bodyText = await res.text(); }catch(e){ bodyText = '<no body>'; }
+              console.error('tickets list fetch failed', { url, status: res.status, statusText: res.statusText, body: bodyText });
+              listEl.textContent = 'Erreur lors du chargement des tickets — ' + res.status + ' ' + (res.statusText || '') + (bodyText ? (': ' + bodyText) : '');
+              return;
+            }
             const data = await res.json();
             renderList(data.tickets || []);
-          }catch(err){ console.error('fetch tickets error', err); listEl.textContent = 'Impossible de contacter le serveur'; }
+          }catch(err){ console.error('fetch tickets error', err); listEl.textContent = 'Impossible de contacter le serveur: ' + (err && err.message ? err.message : err); }
         }
 
         function renderList(tickets){
