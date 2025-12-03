@@ -59,11 +59,13 @@ async function ensureUsersTable(){
         username TEXT UNIQUE NOT NULL,
         password TEXT NOT NULL,
         role TEXT DEFAULT 'User',
+        admin_expires TIMESTAMP NULL,
         created_at TIMESTAMP DEFAULT NOW()
       )
     `);
     // ensure role column exists for older DBs
     await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'User'");
+    await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS admin_expires TIMESTAMP NULL");
   }catch(err){ console.error('ensureUsersTable error', err); }
 }
 
@@ -239,8 +241,11 @@ app.get('/tickets', async (req, res) => {
   if(!adminUser) return res.status(400).json({ error: 'Missing username' });
   try{
     await ensureTicketsTable();
-    const u = await pool.query('SELECT role FROM users WHERE username = $1 LIMIT 1', [adminUser]);
-    if(u.rowCount === 0 || u.rows[0].role !== 'Admin') return res.status(403).json({ error: 'Forbidden' });
+    const u = await pool.query('SELECT role, admin_expires FROM users WHERE username = $1 LIMIT 1', [adminUser]);
+    if(u.rowCount === 0) return res.status(403).json({ error: 'Forbidden' });
+    const userRow = u.rows[0];
+    const isAdmin = userRow.role === 'Admin' || (userRow.admin_expires && new Date(userRow.admin_expires) > new Date());
+    if(!isAdmin) return res.status(403).json({ error: 'Forbidden' });
     const rows = await pool.query('SELECT id, title, sender_username, status, created_at FROM tickets ORDER BY created_at DESC');
     return res.json({ tickets: rows.rows });
   }catch(err){ console.error('list tickets error', err); return res.status(500).json({ error: 'Server error' }); }
@@ -253,8 +258,11 @@ app.get('/tickets/:id', async (req, res) => {
   if(!adminUser) return res.status(400).json({ error: 'Missing username' });
   try{
     await ensureTicketsTable();
-    const u = await pool.query('SELECT role FROM users WHERE username = $1 LIMIT 1', [adminUser]);
-    if(u.rowCount === 0 || u.rows[0].role !== 'Admin') return res.status(403).json({ error: 'Forbidden' });
+    const u = await pool.query('SELECT role, admin_expires FROM users WHERE username = $1 LIMIT 1', [adminUser]);
+    if(u.rowCount === 0) return res.status(403).json({ error: 'Forbidden' });
+    const userRow = u.rows[0];
+    const isAdmin = userRow.role === 'Admin' || (userRow.admin_expires && new Date(userRow.admin_expires) > new Date());
+    if(!isAdmin) return res.status(403).json({ error: 'Forbidden' });
     const t = await pool.query('SELECT * FROM tickets WHERE id = $1 LIMIT 1', [id]);
     if(t.rowCount === 0) return res.status(404).json({ error: 'Not found' });
     return res.json({ ticket: t.rows[0] });
@@ -268,8 +276,11 @@ app.delete('/tickets/:id', async (req, res) => {
   if(!username) return res.status(400).json({ error: 'Missing username' });
   try{
     await ensureTicketsTable();
-    const u = await pool.query('SELECT role FROM users WHERE username = $1 LIMIT 1', [username]);
-    if(u.rowCount === 0 || u.rows[0].role !== 'Admin') return res.status(403).json({ error: 'Forbidden' });
+    const u = await pool.query('SELECT role, admin_expires FROM users WHERE username = $1 LIMIT 1', [username]);
+    if(u.rowCount === 0) return res.status(403).json({ error: 'Forbidden' });
+    const userRow = u.rows[0];
+    const isAdmin = userRow.role === 'Admin' || (userRow.admin_expires && new Date(userRow.admin_expires) > new Date());
+    if(!isAdmin) return res.status(403).json({ error: 'Forbidden' });
     const d = await pool.query('DELETE FROM tickets WHERE id = $1', [id]);
     return res.json({ deleted: d.rowCount > 0 });
   }catch(err){ console.error('delete ticket error', err); return res.status(500).json({ error: 'Server error' }); }
@@ -281,8 +292,11 @@ app.post('/tickets/:id/delete', async (req, res) => {
   if(!username) return res.status(400).json({ error: 'Missing username' });
   try{
     await ensureTicketsTable();
-    const u = await pool.query('SELECT role FROM users WHERE username = $1 LIMIT 1', [username]);
-    if(u.rowCount === 0 || u.rows[0].role !== 'Admin') return res.status(403).json({ error: 'Forbidden' });
+    const u = await pool.query('SELECT role, admin_expires FROM users WHERE username = $1 LIMIT 1', [username]);
+    if(u.rowCount === 0) return res.status(403).json({ error: 'Forbidden' });
+    const userRow = u.rows[0];
+    const isAdmin = userRow.role === 'Admin' || (userRow.admin_expires && new Date(userRow.admin_expires) > new Date());
+    if(!isAdmin) return res.status(403).json({ error: 'Forbidden' });
     const d = await pool.query('DELETE FROM tickets WHERE id = $1', [id]);
     return res.json({ deleted: d.rowCount > 0 });
   }catch(err){ console.error('post delete ticket error', err); return res.status(500).json({ error: 'Server error' }); }
