@@ -52,14 +52,8 @@
               </div>
             </div>
             <div class="boxed" style="margin-top:1rem;padding:1rem" id="ticketBox">
-              <h3 style="margin:0 0 .6rem;color:var(--accent)">Envoyer un ticket</h3>
-              <p style="color:#ddd;margin-top:0">Signalez un problème ou une suggestion à l'équipe.</p>
-              <label style="display:block;margin-top:.6rem;color:var(--muted)">Titre <input id="ticketTitle" type="text" style="width:100%;padding:.6rem;border-radius:8px;border:1px solid rgba(255,212,0,0.08);background:transparent;color:#fff;margin-top:.4rem" /></label>
-              <label style="display:block;margin-top:.6rem;color:var(--muted)">Contenu <textarea id="ticketContent" rows="5" style="width:100%;padding:.6rem;border-radius:8px;border:1px solid rgba(255,212,0,0.08);background:transparent;color:#fff;margin-top:.4rem"></textarea></label>
-              <div style="margin-top:.6rem;display:flex;gap:.6rem;align-items:center">
-                <button id="ticketSubmit" class="btn">Envoyer le ticket</button>
-                <div id="ticketMsg" style="color:#e9e9e9"></div>
-              </div>
+              <h3 style="margin:0 0 .6rem;color:var(--accent)">Tickets</h3>
+              <p style="color:#ddd;margin-top:0">Fonctionnalité de tickets temporairement désactivée.</p>
             </div>
           </div>
         </div>
@@ -177,26 +171,7 @@
         logoutBtnEl.addEventListener('click', ()=>{ localStorage.removeItem('ecities_user'); location.href='/templates/dossier1/index.html'; });
       }
 
-      // ticket form handling
-      (function(){
-        const submit = document.getElementById('ticketSubmit');
-        if(!submit) return;
-        submit.addEventListener('click', async function(){
-          const user = (function(){ try{return JSON.parse(localStorage.getItem('ecities_user')); }catch(e){return null;} })();
-          if(!user || !user.username){ showSitePopup('Veuillez vous connecter pour envoyer un ticket.', 'info'); return; }
-          const title = document.getElementById('ticketTitle').value.trim();
-          const content = document.getElementById('ticketContent').value.trim();
-          if(!title || !content){ showSitePopup('Merci de renseigner le titre et le contenu du ticket.', 'error'); return; }
-          try{
-            const res = await fetch(API_BASE + '/tickets', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ username: user.username, title, content }) });
-            if(!res.ok){ const j = await res.json().catch(()=>({})); showSitePopup('Erreur: ' + (j.error||res.status), 'error'); return; }
-            const data = await res.json();
-            document.getElementById('ticketTitle').value = '';
-            document.getElementById('ticketContent').value = '';
-            showSitePopup('Ticket envoyé — merci !', 'success');
-          }catch(err){ console.error('ticket submit error', err); showSitePopup('Impossible de contacter le serveur.', 'error'); }
-        });
-      })();
+      // tickets désactivés
     </script>
   </body>
 </html>
