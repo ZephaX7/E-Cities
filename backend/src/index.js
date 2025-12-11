@@ -69,6 +69,24 @@ async function ensureUsersTable(){
   }catch(err){ console.error('ensureUsersTable error', err); }
 }
 
+// Ensure tickets table exists helper
+async function ensureTicketsTable(){
+  try{
+    await ensureUsersTable();
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS tickets (
+        id SERIAL PRIMARY KEY,
+        title TEXT NOT NULL,
+        content TEXT NOT NULL,
+        sender_username TEXT NOT NULL,
+        status TEXT DEFAULT 'open',
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+  }catch(err){ console.error('ensureTicketsTable error', err); }
+}
+
 // Ensure votes table exists helper
 async function ensureVotesTable(){
   try{
@@ -200,6 +218,88 @@ app.get('/debug/status', async (req, res) => {
     const recent = await pool.query('SELECT v.id, u.username, v.project_id, v.created_at FROM votes v JOIN users u ON u.id = v.user_id ORDER BY v.created_at DESC LIMIT 20');
     return res.json({ counts: rows.rows, recent: recent.rows });
   }catch(err){ console.error('debug status error', err); return res.status(500).json({ error: 'Server error' }); }
+});
+
+// Tickets endpoints
+// Create ticket: POST { username, title, content }
+app.post('/tickets', async (req, res) => {
+  const { username, title, content } = req.body || {};
+  if(!username || !title || !content) return res.status(400).json({ error: 'Missing fields' });
+  try{
+    await ensureTicketsTable();
+    // verify sender exists
+    const userRes = await pool.query('SELECT id FROM users WHERE username = $1 LIMIT 1', [username]);
+    if(userRes.rowCount === 0) return res.status(404).json({ error: 'User not found' });
+    const insert = await pool.query('INSERT INTO tickets (title, content, sender_username) VALUES ($1, $2, $3) RETURNING id, title, content, sender_username, status, created_at', [title, content, username]);
+    return res.json({ ticket: insert.rows[0] });
+  }catch(err){ console.error('create ticket error', err); return res.status(500).json({ error: 'Server error' }); }
+});
+
+// Admin: list tickets. Query param: username (admin)
+app.get('/tickets', async (req, res) => {
+  const adminUser = req.query.username;
+  if(!adminUser) return res.status(400).json({ error: 'Missing username' });
+  try{
+    await ensureTicketsTable();
+    const u = await pool.query('SELECT role, admin_expires FROM users WHERE username = $1 LIMIT 1', [adminUser]);
+    if(u.rowCount === 0) return res.status(403).json({ error: 'Forbidden' });
+    const userRow = u.rows[0];
+    const isAdmin = userRow.role === 'Admin' || (userRow.admin_expires && new Date(userRow.admin_expires) > new Date());
+    if(!isAdmin) return res.status(403).json({ error: 'Forbidden' });
+    const rows = await pool.query('SELECT id, title, sender_username, status, created_at FROM tickets ORDER BY created_at DESC');
+    return res.json({ tickets: rows.rows });
+  }catch(err){ console.error('list tickets error', err); return res.status(500).json({ error: 'Server error' }); }
+});
+
+// Admin: get ticket details
+app.get('/tickets/:id', async (req, res) => {
+  const adminUser = req.query.username;
+  const id = req.params.id;
+  if(!adminUser) return res.status(400).json({ error: 'Missing username' });
+  try{
+    await ensureTicketsTable();
+    const u = await pool.query('SELECT role, admin_expires FROM users WHERE username = $1 LIMIT 1', [adminUser]);
+    if(u.rowCount === 0) return res.status(403).json({ error: 'Forbidden' });
+    const userRow = u.rows[0];
+    const isAdmin = userRow.role === 'Admin' || (userRow.admin_expires && new Date(userRow.admin_expires) > new Date());
+    if(!isAdmin) return res.status(403).json({ error: 'Forbidden' });
+    const t = await pool.query('SELECT * FROM tickets WHERE id = $1 LIMIT 1', [id]);
+    if(t.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    return res.json({ ticket: t.rows[0] });
+  }catch(err){ console.error('get ticket error', err); return res.status(500).json({ error: 'Server error' }); }
+});
+
+// Admin: delete ticket (compat: POST /tickets/:id/delete and DELETE /tickets/:id)
+app.delete('/tickets/:id', async (req, res) => {
+  const { username } = req.body || {};
+  const id = req.params.id;
+  if(!username) return res.status(400).json({ error: 'Missing username' });
+  try{
+    await ensureTicketsTable();
+    const u = await pool.query('SELECT role, admin_expires FROM users WHERE username = $1 LIMIT 1', [username]);
+    if(u.rowCount === 0) return res.status(403).json({ error: 'Forbidden' });
+    const userRow = u.rows[0];
+    const isAdmin = userRow.role === 'Admin' || (userRow.admin_expires && new Date(userRow.admin_expires) > new Date());
+    if(!isAdmin) return res.status(403).json({ error: 'Forbidden' });
+    const d = await pool.query('DELETE FROM tickets WHERE id = $1', [id]);
+    return res.json({ deleted: d.rowCount > 0 });
+  }catch(err){ console.error('delete ticket error', err); return res.status(500).json({ error: 'Server error' }); }
+});
+
+app.post('/tickets/:id/delete', async (req, res) => {
+  const { username } = req.body || {};
+  const id = req.params.id;
+  if(!username) return res.status(400).json({ error: 'Missing username' });
+  try{
+    await ensureTicketsTable();
+    const u = await pool.query('SELECT role, admin_expires FROM users WHERE username = $1 LIMIT 1', [username]);
+    if(u.rowCount === 0) return res.status(403).json({ error: 'Forbidden' });
+    const userRow = u.rows[0];
+    const isAdmin = userRow.role === 'Admin' || (userRow.admin_expires && new Date(userRow.admin_expires) > new Date());
+    if(!isAdmin) return res.status(403).json({ error: 'Forbidden' });
+    const d = await pool.query('DELETE FROM tickets WHERE id = $1', [id]);
+    return res.json({ deleted: d.rowCount > 0 });
+  }catch(err){ console.error('post delete ticket error', err); return res.status(500).json({ error: 'Server error' }); }
 });
 
 // Register route (username + password)
