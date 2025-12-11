@@ -87,6 +87,24 @@ async function ensureTicketsTable(){
   }catch(err){ console.error('ensureTicketsTable error', err); }
 }
 
+// Ensure ticket replies table exists helper
+async function ensureTicketRepliesTable(){
+  try{
+    await ensureTicketsTable();
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ticket_replies (
+        id SERIAL PRIMARY KEY,
+        ticket_id INTEGER REFERENCES tickets(id) ON DELETE CASCADE,
+        admin_username TEXT NOT NULL,
+        message TEXT NOT NULL,
+        is_read BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await pool.query("ALTER TABLE ticket_replies ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT FALSE");
+  }catch(err){ console.error('ensureTicketRepliesTable error', err); }
+}
+
 // Ensure votes table exists helper
 async function ensureVotesTable(){
   try{
@@ -258,6 +276,7 @@ app.get('/tickets/:id', async (req, res) => {
   if(!adminUser) return res.status(400).json({ error: 'Missing username' });
   try{
     await ensureTicketsTable();
+    await ensureTicketRepliesTable();
     const u = await pool.query('SELECT role, admin_expires FROM users WHERE username = $1 LIMIT 1', [adminUser]);
     if(u.rowCount === 0) return res.status(403).json({ error: 'Forbidden' });
     const userRow = u.rows[0];
@@ -265,8 +284,32 @@ app.get('/tickets/:id', async (req, res) => {
     if(!isAdmin) return res.status(403).json({ error: 'Forbidden' });
     const t = await pool.query('SELECT * FROM tickets WHERE id = $1 LIMIT 1', [id]);
     if(t.rowCount === 0) return res.status(404).json({ error: 'Not found' });
-    return res.json({ ticket: t.rows[0] });
+    const replies = await pool.query('SELECT id, ticket_id, admin_username, message, is_read, created_at FROM ticket_replies WHERE ticket_id = $1 ORDER BY created_at ASC', [id]);
+    return res.json({ ticket: t.rows[0], replies: replies.rows });
   }catch(err){ console.error('get ticket error', err); return res.status(500).json({ error: 'Server error' }); }
+});
+
+// Admin: reply to a ticket
+app.post('/tickets/:id/replies', async (req, res) => {
+  const adminUser = req.body && req.body.username;
+  const message = (req.body && req.body.message) || '';
+  const id = req.params.id;
+  if(!adminUser || !message.trim()) return res.status(400).json({ error: 'Missing username or message' });
+  try{
+    await ensureTicketRepliesTable();
+    const u = await pool.query('SELECT role, admin_expires FROM users WHERE username = $1 LIMIT 1', [adminUser]);
+    if(u.rowCount === 0) return res.status(403).json({ error: 'Forbidden' });
+    const userRow = u.rows[0];
+    const isAdmin = userRow.role === 'Admin' || (userRow.admin_expires && new Date(userRow.admin_expires) > new Date());
+    if(!isAdmin) return res.status(403).json({ error: 'Forbidden' });
+
+    // ensure ticket exists and get sender to mark ownership
+    const t = await pool.query('SELECT id, sender_username FROM tickets WHERE id = $1 LIMIT 1', [id]);
+    if(t.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+
+    const insert = await pool.query('INSERT INTO ticket_replies (ticket_id, admin_username, message, is_read) VALUES ($1, $2, $3, FALSE) RETURNING id, ticket_id, admin_username, message, is_read, created_at', [id, adminUser, message]);
+    return res.json({ reply: insert.rows[0] });
+  }catch(err){ console.error('reply ticket error', err); return res.status(500).json({ error: 'Server error' }); }
 });
 
 // Admin: delete ticket (compat: POST /tickets/:id/delete and DELETE /tickets/:id)
@@ -366,6 +409,60 @@ app.post('/admin/elevate', async (req, res) => {
     await pool.query('UPDATE users SET admin_expires = $1 WHERE username = $2', [expires, username]);
     return res.json({ elevated: true, expiresAt: expires.toISOString() });
   }catch(err){ console.error('admin elevate error', err); return res.status(500).json({ error: 'Server error' }); }
+});
+
+// User inbox: list replies to their tickets
+app.get('/inbox', async (req, res) => {
+  const username = req.query.username;
+  if(!username) return res.status(400).json({ error: 'Missing username' });
+  try{
+    await ensureTicketRepliesTable();
+    const rows = await pool.query(`
+      SELECT r.id, r.ticket_id, t.title AS ticket_title, r.message, r.is_read, r.created_at
+      FROM ticket_replies r
+      JOIN tickets t ON t.id = r.ticket_id
+      WHERE t.sender_username = $1
+      ORDER BY r.created_at DESC
+    `, [username]);
+    const unreadCount = rows.rows.filter(r => !r.is_read).length;
+    return res.json({ replies: rows.rows, unreadCount });
+  }catch(err){ console.error('inbox list error', err); return res.status(500).json({ error: 'Server error' }); }
+});
+
+// User inbox: mark reply as read
+app.post('/inbox/:id/read', async (req, res) => {
+  const username = req.body && req.body.username;
+  const id = req.params.id;
+  if(!username) return res.status(400).json({ error: 'Missing username' });
+  try{
+    await ensureTicketRepliesTable();
+    // Ensure reply belongs to user's ticket
+    const owns = await pool.query(`
+      SELECT r.id FROM ticket_replies r
+      JOIN tickets t ON t.id = r.ticket_id
+      WHERE r.id = $1 AND t.sender_username = $2
+      LIMIT 1
+    `, [id, username]);
+    if(owns.rowCount === 0) return res.status(403).json({ error: 'Forbidden' });
+    await pool.query('UPDATE ticket_replies SET is_read = TRUE WHERE id = $1', [id]);
+    return res.json({ updated: true });
+  }catch(err){ console.error('inbox read error', err); return res.status(500).json({ error: 'Server error' }); }
+});
+
+// User inbox: unread count only
+app.get('/inbox/count', async (req, res) => {
+  const username = req.query.username;
+  if(!username) return res.status(400).json({ error: 'Missing username' });
+  try{
+    await ensureTicketRepliesTable();
+    const rows = await pool.query(`
+      SELECT COUNT(*)::int AS count
+      FROM ticket_replies r
+      JOIN tickets t ON t.id = r.ticket_id
+      WHERE t.sender_username = $1 AND r.is_read = FALSE
+    `, [username]);
+    return res.json({ unread: rows.rows[0].count });
+  }catch(err){ console.error('inbox count error', err); return res.status(500).json({ error: 'Server error' }); }
 });
 
 const PORT = process.env.PORT || 3000;
