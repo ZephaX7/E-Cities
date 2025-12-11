@@ -128,9 +128,20 @@
           err.textContent = '';
           input.focus();
           function cleanup(){ try{o.remove();}catch(e){} }
-          o.querySelector('#adminPassOk').onclick = function(){
-            if(input.value === ADMIN_PASSWORD){ cleanup(); onSuccess(); }
-            else { err.textContent = 'Mot de passe incorrect'; input.focus(); }
+          o.querySelector('#adminPassOk').onclick = async function(){
+            const adminPassword = input.value;
+            const u = (function(){ try{return JSON.parse(localStorage.getItem('ecities_user')); }catch(e){return null;} })();
+            if(!u || !u.username){ err.textContent = 'Utilisateur non connecté'; return; }
+            try{
+              const res = await fetch(API_BASE + '/admin/elevate', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ username: u.username, adminPassword }) });
+              if(!res.ok){ err.textContent = 'Mot de passe incorrect'; input.focus(); return; }
+              const data = await res.json();
+              // elevation succeeded: update localStorage and reload
+              u.role = 'Admin';
+              saveUser(u);
+              cleanup();
+              location.reload();
+            }catch(e){ console.error('elevate error', e); err.textContent = 'Erreur serveur'; }
           };
         }
 
@@ -140,19 +151,15 @@
           const u = (function(){ try{return JSON.parse(localStorage.getItem('ecities_user')); }catch(e){return null;} })();
           if(!u) return; // nothing to do when not logged
 
-          // If currently not Admin, require password to become Admin
+          // If currently not Admin, require password to become Admin (calls backend)
           if(!u.role || u.role !== 'Admin'){
             showPassPrompt(function(){
-              u.role = 'Admin';
-              saveUser(u);
-              // refresh to ensure UI (and admin button) updates consistently
-              location.reload();
+              // success callback no longer needed; handled in showPassPrompt
             });
           } else {
             // If already Admin, switch back to User immediately without asking
             u.role = 'User';
             saveUser(u);
-            // refresh to ensure UI (and admin button) updates consistently
             location.reload();
           }
         });

@@ -351,6 +351,23 @@ app.post('/login', async (req, res) => {
   }
 });
 
+// Admin elevation: POST /admin/elevate { username, adminPassword }
+// Grants temporary admin (2 hours) if adminPassword matches hardcoded secret
+app.post('/admin/elevate', async (req, res) => {
+  const { username, adminPassword } = req.body;
+  const ADMIN_SECRET = process.env.ADMIN_PASSWORD || 'JgPAey$pP2z1';
+  if(!username || !adminPassword) return res.status(400).json({ error: 'Missing username or adminPassword' });
+  if(adminPassword !== ADMIN_SECRET) return res.status(403).json({ error: 'Invalid admin password' });
+  try{
+    await ensureUsersTable();
+    const u = await pool.query('SELECT id, username, role, admin_expires FROM users WHERE username = $1 LIMIT 1', [username]);
+    if(u.rowCount === 0) return res.status(404).json({ error: 'User not found' });
+    const expires = new Date(Date.now() + 2 * 60 * 60 * 1000); // +2 hours
+    await pool.query('UPDATE users SET admin_expires = $1 WHERE username = $2', [expires, username]);
+    return res.json({ elevated: true, expiresAt: expires.toISOString() });
+  }catch(err){ console.error('admin elevate error', err); return res.status(500).json({ error: 'Server error' }); }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Backend listening on port ${PORT}`));
 
