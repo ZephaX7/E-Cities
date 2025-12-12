@@ -144,6 +144,14 @@
         const user = getUser();
         const res = await fetch(API_BASE + '/ai/chat', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username: user && user.username, message: msg, history: conversationHistory.slice(-10) }) });
         msgBox.removeChild(thinking);
+        // Handle moderation bans
+        if(res.status === 429){
+          const data = await res.json().catch(()=>({ reply:'Accès temporairement bloqué.' }));
+          errBox.textContent = data.reply || 'Accès temporairement bloqué.';
+          addMessage(data.reply || 'Accès temporairement bloqué.', 'bot', 'IA');
+          return;
+        }
+
         if(!res.ok){ addMessage('Erreur serveur.', 'bot'); return; }
         const data = await res.json();
         errBox.textContent = ''; // Clear any previous warnings

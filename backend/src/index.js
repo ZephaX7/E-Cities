@@ -13,6 +13,9 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
+// In-memory temp ban map for chatbot (key -> timestamp ms)
+const chatBanMap = new Map();
+
 const app = express();
 // Allow configurable origin for production (set ALLOWED_ORIGIN to your frontend URL)
 const allowedOrigin = process.env.ALLOWED_ORIGIN || '*';
@@ -525,6 +528,17 @@ app.post('/ai/chat', async (req, res) => {
   const { username, message, history } = req.body || {};
   if(!message || !message.trim()) return res.status(400).json({ error: 'Missing message' });
 
+  const chatKey = (username && username.trim()) || req.ip || 'anon';
+  const now = Date.now();
+
+  // Unban if expired
+  const existingBan = chatBanMap.get(chatKey);
+  if(existingBan && existingBan > now){
+    return res.status(429).json({ reply: 'Vous avez été temporairement bloqué pour messages inappropriés. Réessayez dans quelques minutes.', banned: true, retryAt: new Date(existingBan).toISOString() });
+  }else if(existingBan){
+    chatBanMap.delete(chatKey);
+  }
+
   // Smart ticket collector mode - provides helpful responses without external AI
   function generateSmartReply(userMessage){
     const lower = userMessage.toLowerCase();
@@ -613,12 +627,20 @@ app.post('/ai/chat', async (req, res) => {
     return 'Merci pour votre message ! 📩\n\nVotre demande a été transmise à notre équipe. Un administrateur vous répondra rapidement via ce chat.\n\nEn attendant, n\'hésitez pas à me poser d\'autres questions sur E-cities !';
   }
 
+  // Basic moderation (temp ban 5 minutes)
+  const lowerMsg = message.toLowerCase();
+  const badWords = /(putain|merde|connard|conne|salope|batard|bâtard|fdp|fils de pute|enculé|encule|nique ta mère|ntm|ta gueule|fuck|shit)/i;
+  if(badWords.test(lowerMsg)){
+    const until = now + 5 * 60 * 1000;
+    chatBanMap.set(chatKey, until);
+    return res.status(429).json({ reply: 'Message inapproprié détecté. Le chat est bloqué pendant 5 minutes.', banned: true, retryAt: new Date(until).toISOString() });
+  }
+
   const aiReply = generateSmartReply(message);
   const usedAI = false;
   console.log('[AI] Smart reply mode:', aiReply.slice(0, 60) + '...');
 
   // Auto-create ticket for ALL messages (smart collector mode)
-  const lowerMsg = message.toLowerCase();
   let ticketCreated = false;
   let ticketId = null;
   const ticketUser = username || 'chatbot-anon';
