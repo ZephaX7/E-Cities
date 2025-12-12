@@ -578,8 +578,8 @@ app.post('/ai/chat', async (req, res) => {
   if(username && seemsProblem){
     try{
       await ensureTicketsTable();
-      const title = 'Conversation chatbot: ' + message.slice(0,60);
-      const content = `Demande via chatbot:\n${message}\n\nRéponse IA:\n${aiReply}`;
+      const title = '🤖 Chatbot: ' + message.slice(0,50);
+      const content = `📝 Conversation chatbot\nUtilisateur: ${username}\n\nDemande:\n${message}\n\nRéponse IA:\n${aiReply}`;
       await pool.query('INSERT INTO tickets (title, content, sender_username, status) VALUES ($1, $2, $3, $4)', [title, content, username, 'open']);
       ticketCreated = true;
     }catch(err){

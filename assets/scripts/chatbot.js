@@ -5,7 +5,19 @@
 
   function getUser(){ try{return JSON.parse(localStorage.getItem('ecities_user'));}catch(e){return null;} }
 
-  let conversationHistory = [];
+  // Load conversation from localStorage
+  function loadHistory(){
+    try{
+      const saved = localStorage.getItem('ecities_chat_history');
+      return saved ? JSON.parse(saved) : [];
+    }catch(e){ return []; }
+  }
+
+  function saveHistory(history){
+    try{ localStorage.setItem('ecities_chat_history', JSON.stringify(history)); }catch(e){}
+  }
+
+  let conversationHistory = loadHistory();
 
   function createUI(){
     if(document.getElementById('aiChatLauncher')) return;
@@ -45,6 +57,17 @@
     const errBox = panel.querySelector('#cbErr');
     const inputEl = panel.querySelector('#cbUserMsg');
 
+    // Restore previous messages
+    function restoreMessages(){
+      conversationHistory.forEach(h => {
+        const el = document.createElement('div');
+        el.className = 'cb-msg ' + (h.role === 'user' ? 'user' : 'bot');
+        el.textContent = h.content;
+        msgBox.appendChild(el);
+      });
+      msgBox.scrollTop = msgBox.scrollHeight;
+    }
+
     function toggle(){
       panel.classList.toggle('open');
       if(panel.classList.contains('open')){
@@ -65,6 +88,7 @@
       msgBox.scrollTop = msgBox.scrollHeight;
       if(from === 'user') conversationHistory.push({ role: 'user', content: text });
       else if(from === 'bot') conversationHistory.push({ role: 'assistant', content: text });
+      saveHistory(conversationHistory);
     }
 
     async function send(){
@@ -94,6 +118,9 @@
 
     sendBtn.addEventListener('click', send);
     inputEl.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); send(); } });
+
+    // Restore messages on load
+    restoreMessages();
   }
 
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', createUI); else createUI();
