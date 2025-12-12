@@ -518,6 +518,81 @@ app.get('/inbox/count', async (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Backend listening on port ${PORT}`));
 
+// AI triage (chatbot) endpoint
+// POST /ai/triage { username?, title, content }
+// If AI_API_KEY is not provided, returns a simple heuristic triage.
+app.post('/ai/triage', async (req, res) => {
+  const { username, title, content } = req.body || {};
+  if(!title || !content) return res.status(400).json({ error: 'Missing title or content' });
+
+  const apiKey = process.env.AI_API_KEY;
+  const apiUrl = process.env.AI_API_URL || 'https://api.openai.com/v1/chat/completions';
+  const model = process.env.AI_MODEL || 'gpt-4o-mini';
+
+  function heuristic(){
+    const text = (title + ' ' + content).toLowerCase();
+    let category = 'Autre';
+    if(/panne|bug|erreur|404|500|crash/.test(text)) category = 'Bug';
+    else if(/idée|suggestion|amélioration|feature/.test(text)) category = 'Suggestion';
+    else if(/paiement|facture|billing|abonnement/.test(text)) category = 'Facturation';
+    else if(/sécurité|security|attaque|hack/.test(text)) category = 'Sécurité';
+    const priority = /urgent|immédiat|bloquant|critical/.test(text) ? 'Haute' : 'Normale';
+    return {
+      provider: 'heuristic',
+      category,
+      priority,
+      summary: title.slice(0,180),
+      next_actions: ['Vérifier le ticket', 'Assigner un agent', 'Répondre à l\'utilisateur']
+    };
+  }
+
+  // If no API key, fallback immediately
+  if(!apiKey){
+    return res.json({ triage: heuristic(), usedAI: false });
+  }
+
+  try{
+    const prompt = `Tu es un assistant support. Catégorise et priorise le ticket ci-dessous et propose 2 prochaines actions concises en français.
+
+Titre: ${title}
+Contenu: ${content}
+
+Réponds en JSON avec les clés category, priority, summary, next_actions (liste).`;
+
+    const aiRes = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: 'Tu es un assistant de triage de tickets concis.' },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.3,
+      })
+    });
+
+    if(!aiRes.ok){
+      console.warn('AI API non-200', aiRes.status, await aiRes.text().catch(()=>''));
+      return res.json({ triage: heuristic(), usedAI: false, error: 'ai_error' });
+    }
+    const data = await aiRes.json();
+    const text = data.choices?.[0]?.message?.content || '';
+    let parsed = null;
+    try{ parsed = JSON.parse(text); }catch(_){ parsed = null; }
+    if(!parsed || !parsed.category){
+      return res.json({ triage: heuristic(), usedAI: false, error: 'parse_error' });
+    }
+    return res.json({ triage: parsed, usedAI: true });
+  }catch(err){
+    console.error('ai triage error', err);
+    return res.json({ triage: heuristic(), usedAI: false, error: 'exception' });
+  }
+});
+
 process.on('uncaughtException', (err) => {
   console.error('Uncaught exception', err);
   // keep process running for Render to capture logs; optionally exit
