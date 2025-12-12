@@ -60,10 +60,14 @@
       const items = replies.length === 0
         ? '<div style="color:#cfcfcf">Aucune réponse pour le moment.</div>'
         : replies.map(r => `
-            <div class="inbox-item ${r.is_read ? '' : 'unread'}" data-id="${r.id}">
+            <div class="inbox-item ${r.is_read ? '' : 'unread'}" data-id="${r.id}" data-ticket-id="${r.ticket_id}">
               <div class="modal-title" style="font-size:1rem;">${escapeText(r.ticket_title)}</div>
               <div class="modal-meta">${new Date(r.created_at).toLocaleString()}</div>
               <div class="inbox-msg">${escapeText(r.message)}</div>
+              <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+                <button class="btn small ghost" data-action="reply" data-id="${r.id}" data-ticket="${r.ticket_id}">Répondre</button>
+                <button class="btn small danger" data-action="delete" data-id="${r.id}">Supprimer</button>
+              </div>
             </div>
           `).join('');
 
@@ -78,13 +82,43 @@
       if(closeBtn) closeBtn.addEventListener('click', ()=>modal.remove());
 
       modal.querySelectorAll('.inbox-item').forEach(el => {
-        el.addEventListener('click', async ()=>{
+        el.addEventListener('click', async (ev)=>{
+          // ignore clicks on action buttons to avoid double-calls
+          const act = ev.target && ev.target.getAttribute && ev.target.getAttribute('data-action');
+          if(act) return;
           const rid = el.getAttribute('data-id');
           try{
             const rres = await fetch(API_BASE + '/inbox/' + encodeURIComponent(rid) + '/read', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username: user.username }) });
             if(rres.ok){ el.classList.remove('unread'); updateBadge(); }
           }catch(err){ console.error('mark read', err); }
         });
+      });
+
+      // action buttons (reply/delete)
+      modal.querySelector('#inboxList').addEventListener('click', async (e)=>{
+        const action = e.target && e.target.getAttribute('data-action');
+        if(!action) return;
+        e.stopPropagation();
+        const rid = e.target.getAttribute('data-id');
+        const ticketId = e.target.getAttribute('data-ticket');
+        if(action === 'reply'){
+          const message = (prompt('Votre réponse :') || '').trim();
+          if(!message) return;
+          try{
+            const rres = await fetch(API_BASE + '/tickets/' + encodeURIComponent(ticketId) + '/replies', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username: user.username, message }) });
+            if(!rres.ok){ showNotice('Erreur lors de l\'envoi de la réponse.', 'error'); return; }
+            showNotice('Réponse envoyée.', 'info');
+          }catch(err){ console.error('reply error', err); showNotice('Erreur lors de l\'envoi.', 'error'); }
+        } else if(action === 'delete'){
+          try{
+            const dres = await fetch(API_BASE + '/inbox/' + encodeURIComponent(rid) + '/delete', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username: user.username }) });
+            if(!dres.ok){ showNotice('Suppression impossible.', 'error'); return; }
+            const item = e.target.closest('.inbox-item');
+            if(item) item.remove();
+            updateBadge();
+            showNotice('Notification supprimée.', 'info');
+          }catch(err){ console.error('delete notification', err); showNotice('Suppression impossible.', 'error'); }
+        }
       });
     }catch(err){ console.error('open inbox', err); showNotice('Erreur lors de l\'ouverture de la boîte.', 'error'); }
   }

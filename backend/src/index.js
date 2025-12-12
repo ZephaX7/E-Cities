@@ -102,6 +102,10 @@ async function ensureTicketRepliesTable(){
       )
     `);
     await pool.query("ALTER TABLE ticket_replies ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT FALSE");
+    await pool.query("ALTER TABLE ticket_replies ADD COLUMN IF NOT EXISTS sender_username TEXT");
+    await pool.query("ALTER TABLE ticket_replies ADD COLUMN IF NOT EXISTS sender_role TEXT DEFAULT 'Admin'");
+    await pool.query("ALTER TABLE ticket_replies ADD COLUMN IF NOT EXISTS user_deleted BOOLEAN DEFAULT FALSE");
+    await pool.query("ALTER TABLE ticket_replies ALTER COLUMN admin_username DROP NOT NULL");
   }catch(err){ console.error('ensureTicketRepliesTable error', err); }
 }
 
@@ -284,32 +288,51 @@ app.get('/tickets/:id', async (req, res) => {
     if(!isAdmin) return res.status(403).json({ error: 'Forbidden' });
     const t = await pool.query('SELECT * FROM tickets WHERE id = $1 LIMIT 1', [id]);
     if(t.rowCount === 0) return res.status(404).json({ error: 'Not found' });
-    const replies = await pool.query('SELECT id, ticket_id, admin_username, message, is_read, created_at FROM ticket_replies WHERE ticket_id = $1 ORDER BY created_at ASC', [id]);
+    const replies = await pool.query('SELECT id, ticket_id, admin_username, sender_username, sender_role, message, is_read, user_deleted, created_at FROM ticket_replies WHERE ticket_id = $1 ORDER BY created_at ASC', [id]);
     return res.json({ ticket: t.rows[0], replies: replies.rows });
   }catch(err){ console.error('get ticket error', err); return res.status(500).json({ error: 'Server error' }); }
 });
 
 // Admin: reply to a ticket
 app.post('/tickets/:id/replies', async (req, res) => {
-  const adminUser = req.body && req.body.username;
+  const username = req.body && req.body.username;
   const message = (req.body && req.body.message) || '';
   const id = req.params.id;
-  if(!adminUser || !message.trim()) return res.status(400).json({ error: 'Missing username or message' });
+  if(!username || !message.trim()) return res.status(400).json({ error: 'Missing username or message' });
   try{
     await ensureTicketRepliesTable();
-    const u = await pool.query('SELECT role, admin_expires FROM users WHERE username = $1 LIMIT 1', [adminUser]);
+    // ensure ticket exists
+    const t = await pool.query('SELECT id, sender_username FROM tickets WHERE id = $1 LIMIT 1', [id]);
+    if(t.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    const ticketSender = t.rows[0].sender_username;
+
+    // find caller role
+    const u = await pool.query('SELECT role, admin_expires FROM users WHERE username = $1 LIMIT 1', [username]);
     if(u.rowCount === 0) return res.status(403).json({ error: 'Forbidden' });
     const userRow = u.rows[0];
     const isAdmin = userRow.role === 'Admin' || (userRow.admin_expires && new Date(userRow.admin_expires) > new Date());
-    if(!isAdmin) return res.status(403).json({ error: 'Forbidden' });
+    const isOwner = ticketSender === username;
 
-    // ensure ticket exists and get sender to mark ownership
-    const t = await pool.query('SELECT id, sender_username FROM tickets WHERE id = $1 LIMIT 1', [id]);
-    if(t.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    if(!isAdmin && !isOwner) return res.status(403).json({ error: 'Forbidden' });
 
-    const insert = await pool.query('INSERT INTO ticket_replies (ticket_id, admin_username, message, is_read) VALUES ($1, $2, $3, FALSE) RETURNING id, ticket_id, admin_username, message, is_read, created_at', [id, adminUser, message]);
+    const role = isAdmin ? 'Admin' : 'User';
+    const adminUsername = isAdmin ? username : null;
+    const insert = await pool.query(
+      'INSERT INTO ticket_replies (ticket_id, admin_username, sender_username, sender_role, message, is_read, user_deleted) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, ticket_id, admin_username, sender_username, sender_role, message, is_read, user_deleted, created_at',
+      [id, adminUsername, username, role, message, isAdmin ? false : true, false]
+    );
     return res.json({ reply: insert.rows[0] });
   }catch(err){ console.error('reply ticket error', err); return res.status(500).json({ error: 'Server error' }); }
+});
+
+// User reply shortcut (alias to POST /tickets/:id/replies for clarity)
+app.post('/tickets/:id/user-replies', async (req, res) => {
+  // Delegate to the main replies endpoint logic by calling the same handler
+  req.body = req.body || {};
+  // Inject params and call next tick
+  req.url = `/tickets/${req.params.id}/replies`;
+  req.originalUrl = req.url;
+  app._router.handle(req, res, ()=>{});
 });
 
 // Admin: delete ticket (compat: POST /tickets/:id/delete and DELETE /tickets/:id)
@@ -421,7 +444,7 @@ app.get('/inbox', async (req, res) => {
       SELECT r.id, r.ticket_id, t.title AS ticket_title, r.message, r.is_read, r.created_at
       FROM ticket_replies r
       JOIN tickets t ON t.id = r.ticket_id
-      WHERE t.sender_username = $1
+      WHERE t.sender_username = $1 AND r.user_deleted = FALSE AND COALESCE(r.sender_role, 'Admin') = 'Admin'
       ORDER BY r.created_at DESC
     `, [username]);
     const unreadCount = rows.rows.filter(r => !r.is_read).length;
@@ -440,13 +463,32 @@ app.post('/inbox/:id/read', async (req, res) => {
     const owns = await pool.query(`
       SELECT r.id FROM ticket_replies r
       JOIN tickets t ON t.id = r.ticket_id
-      WHERE r.id = $1 AND t.sender_username = $2
+      WHERE r.id = $1 AND t.sender_username = $2 AND r.user_deleted = FALSE
       LIMIT 1
     `, [id, username]);
     if(owns.rowCount === 0) return res.status(403).json({ error: 'Forbidden' });
     await pool.query('UPDATE ticket_replies SET is_read = TRUE WHERE id = $1', [id]);
     return res.json({ updated: true });
   }catch(err){ console.error('inbox read error', err); return res.status(500).json({ error: 'Server error' }); }
+});
+
+// User inbox: delete a notification (soft delete for the user)
+app.post('/inbox/:id/delete', async (req, res) => {
+  const username = req.body && req.body.username;
+  const id = req.params.id;
+  if(!username) return res.status(400).json({ error: 'Missing username' });
+  try{
+    await ensureTicketRepliesTable();
+    const owns = await pool.query(`
+      SELECT r.id FROM ticket_replies r
+      JOIN tickets t ON t.id = r.ticket_id
+      WHERE r.id = $1 AND t.sender_username = $2 AND r.user_deleted = FALSE
+      LIMIT 1
+    `, [id, username]);
+    if(owns.rowCount === 0) return res.status(403).json({ error: 'Forbidden' });
+    await pool.query('UPDATE ticket_replies SET user_deleted = TRUE, is_read = TRUE WHERE id = $1', [id]);
+    return res.json({ deleted: true });
+  }catch(err){ console.error('inbox delete error', err); return res.status(500).json({ error: 'Server error' }); }
 });
 
 // User inbox: unread count only
@@ -459,7 +501,7 @@ app.get('/inbox/count', async (req, res) => {
       SELECT COUNT(*)::int AS count
       FROM ticket_replies r
       JOIN tickets t ON t.id = r.ticket_id
-      WHERE t.sender_username = $1 AND r.is_read = FALSE
+      WHERE t.sender_username = $1 AND r.is_read = FALSE AND r.user_deleted = FALSE AND COALESCE(r.sender_role, 'Admin') = 'Admin'
     `, [username]);
     return res.json({ unread: rows.rows[0].count });
   }catch(err){ console.error('inbox count error', err); return res.status(500).json({ error: 'Server error' }); }
