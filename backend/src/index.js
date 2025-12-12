@@ -529,33 +529,88 @@ app.post('/ai/chat', async (req, res) => {
   function generateSmartReply(userMessage){
     const lower = userMessage.toLowerCase();
     
-    // Project-related questions
-    if(/projet|project|créer|create|ajouter|add/.test(lower)){
-      return 'Pour créer un projet : allez dans la section "Projets" et cliquez sur "Nouveau projet". Vous pourrez ajouter un titre, une description et des images. Besoin d\'aide supplémentaire ? Un administrateur vous répondra sous peu.';
+    // Greetings
+    if(/^(bonjour|salut|hello|hi|hey|coucou)[\s!?]*$/i.test(userMessage.trim())){
+      return 'Bonjour ! 👋 Je suis l\'assistant E-cities. Comment puis-je vous aider aujourd\'hui ? Vous pouvez me poser des questions sur les projets, les votes, votre compte ou la visualisation 3D.';
     }
     
-    // Vote-related questions
-    if(/vote|voter|voting/.test(lower)){
-      return 'Pour voter : ouvrez un projet et cliquez sur le bouton de vote. Vous pouvez voter pour plusieurs projets. Vos votes sont enregistrés automatiquement.';
+    // Thanks
+    if(/merci|thanks|thank you/i.test(lower)){
+      return 'De rien ! N\'hésitez pas si vous avez d\'autres questions. Je suis là pour vous aider ! 😊';
     }
     
-    // Ticket/support questions
-    if(/ticket|aide|help|support|problème|erreur|bug/.test(lower)){
-      return 'Votre demande a bien été enregistrée ! Un administrateur la traitera dans les meilleurs délais. Vous recevrez une réponse dans la section "Tickets" de votre profil.';
+    // Project creation
+    if(/(comment|how).*(créer|create|faire|make).*(projet|project)/i.test(lower)){
+      return '📝 Pour créer un projet :\n1. Cliquez sur "Projets" dans le menu\n2. Cliquez sur "Nouveau projet"\n3. Remplissez le titre et la description\n4. Ajoutez des images si vous le souhaitez\n5. Validez !\n\nVotre projet sera visible par tous les utilisateurs qui pourront voter.';
     }
     
-    // Account questions
-    if(/compte|account|profil|profile|connexion|login/.test(lower)){
-      return 'Pour gérer votre compte, allez dans votre profil (icône en haut à droite). Vous pouvez y modifier vos informations et voir vos tickets. Besoin d\'aide ? Un admin vous répondra bientôt.';
+    // Project visibility/status
+    if(/projet.*(visible|voir|afficher|apparaît|published)/i.test(lower)){
+      return 'Une fois créé, votre projet est immédiatement visible dans la liste des projets. Les autres utilisateurs peuvent le consulter et voter pour soutenir votre idée ! 🎉';
+    }
+    
+    // Voting system
+    if(/(comment|how).*(vote|voter)/i.test(lower)){
+      return '🗳️ Pour voter pour un projet :\n1. Parcourez la liste des projets\n2. Cliquez sur un projet qui vous intéresse\n3. Cliquez sur le bouton "Voter"\n\nVous pouvez voter pour autant de projets que vous le souhaitez. Vos votes sont enregistrés instantanément !';
+    }
+    
+    // Vote count/results
+    if(/combien|nombre|résultat|score|classement/i.test(lower) && /vote/i.test(lower)){
+      return 'Le nombre de votes pour chaque projet est affiché directement sur la carte du projet. Les projets les plus populaires apparaissent en tête de liste ! 📊';
+    }
+    
+    // Remove vote
+    if(/(retirer|enlever|supprimer|annuler).*(vote)/i.test(lower)){
+      return 'Pour retirer votre vote, retournez sur le projet et cliquez à nouveau sur le bouton de vote. Il changera pour indiquer que votre vote a été retiré. ↩️';
+    }
+    
+    // Account/Profile
+    if(/(comment|where|où).*(profil|profile|compte|account)/i.test(lower)){
+      return '👤 Pour accéder à votre profil :\n• Cliquez sur le bouton "Info" en haut à droite\n\nDans votre profil, vous pouvez :\n• Voir vos informations personnelles\n• Consulter vos tickets\n• Gérer vos paramètres';
+    }
+    
+    // Password/login issues
+    if(/(mot de passe|password|connexion|login|connect)/i.test(lower)){
+      return '🔐 Problème de connexion ?\n• Vérifiez que votre nom d\'utilisateur et mot de passe sont corrects\n• Les mots de passe sont sensibles à la casse\n\nSi le problème persiste, un administrateur peut vous aider à réinitialiser votre compte.';
     }
     
     // 3D visualization
-    if(/3d|visualisation|visualization|carte|map/.test(lower)){
-      return 'La visualisation 3D vous permet d\'explorer les projets sur une carte interactive. Cliquez sur "Visualisation" dans le menu pour y accéder.';
+    if(/3d|visualisation|visualization|carte|map/i.test(lower)){
+      return '🗺️ La visualisation 3D vous permet d\'explorer tous les projets sur une carte interactive en 3D !\n\nPour y accéder :\n• Cliquez sur "Visualisation" dans le menu principal\n• Naviguez sur la carte pour découvrir les projets\n• Cliquez sur un projet pour voir ses détails';
     }
     
-    // General fallback
-    return 'Merci pour votre message ! Votre demande a été transmise à notre équipe. Un administrateur vous répondra rapidement via le système de tickets.';
+    // Tickets/Support
+    if(/ticket|support/i.test(lower) && !/(créer|create|faire|make)/i.test(lower)){
+      return '🎫 Vos tickets :\n• Vous pouvez consulter tous vos tickets depuis votre profil\n• Les administrateurs répondent généralement sous 24-48h\n• Vous serez notifié quand un admin répond à votre ticket';
+    }
+    
+    // Report problem
+    if(/(problème|erreur|bug|panne|ne marche pas|ne fonctionne pas|cassé|broken)/i.test(lower)){
+      return '⚠️ Je comprends que vous rencontrez un problème. Votre demande a été automatiquement transmise à l\'équipe technique.\n\nUn administrateur analysera votre situation et vous répondra rapidement. En attendant, essayez de :\n• Rafraîchir la page (F5)\n• Vérifier votre connexion internet\n• Essayer un autre navigateur';
+    }
+    
+    // Help/general assistance
+    if(/^(aide|help|info)[\s!?]*$/i.test(userMessage.trim())){
+      return '💡 Je peux vous aider avec :\n• Création et gestion de projets\n• Système de votes\n• Visualisation 3D\n• Votre compte et profil\n• Résolution de problèmes techniques\n\nPosez-moi simplement votre question !';
+    }
+    
+    // Who are you
+    if(/(qui es-tu|qui êtes-vous|who are you|c\'est quoi|what are you)/i.test(lower)){
+      return 'Je suis l\'assistant virtuel d\'E-cities ! 🤖\n\nMa mission est de vous aider à utiliser la plateforme et de répondre à vos questions. Si je ne peux pas résoudre votre problème, un administrateur humain prendra le relais !';
+    }
+    
+    // What is E-cities
+    if(/(c\'est quoi|what is|qu\'est-ce que).*(e-cities|plateforme|site)/i.test(lower)){
+      return 'E-cities est une plateforme collaborative qui permet aux citoyens de :\n• 🏗️ Proposer des projets pour améliorer leur quartier\n• 🗳️ Voter pour les projets qui les intéressent\n• 🗺️ Visualiser tous les projets sur une carte 3D interactive\n\nC\'est un espace où vos idées prennent vie !';
+    }
+    
+    // General conversational fallback
+    if(userMessage.trim().length < 10){
+      return 'Je ne suis pas sûr de comprendre. Pouvez-vous reformuler votre question ? Je peux vous aider avec les projets, les votes, la visualisation 3D ou votre compte. 🤔';
+    }
+    
+    // Default fallback
+    return 'Merci pour votre message ! 📩\n\nVotre demande a été transmise à notre équipe. Un administrateur vous répondra rapidement via ce chat.\n\nEn attendant, n\'hésitez pas à me poser d\'autres questions sur E-cities !';
   }
 
   const aiReply = generateSmartReply(message);
@@ -565,6 +620,7 @@ app.post('/ai/chat', async (req, res) => {
   // Auto-create ticket for ALL messages (smart collector mode)
   const lowerMsg = message.toLowerCase();
   let ticketCreated = false;
+  let ticketId = null;
   const ticketUser = username || 'chatbot-anon';
   console.log('[AI] Creating ticket for:', { username: ticketUser, messagePreview: lowerMsg.slice(0, 50) });
   
@@ -574,12 +630,13 @@ app.post('/ai/chat', async (req, res) => {
     const content = `💬 Message depuis le chatbot\nUtilisateur: ${ticketUser}\n\nMessage:\n${message}\n\nRéponse automatique:\n${aiReply}`;
     const result = await pool.query('INSERT INTO tickets (title, content, sender_username, status) VALUES ($1, $2, $3, $4) RETURNING id', [title, content, ticketUser, 'open']);
     ticketCreated = true;
-    console.log('[AI] Ticket created with ID:', result.rows[0].id);
+    ticketId = result.rows[0].id;
+    console.log('[AI] Ticket created with ID:', ticketId);
   }catch(err){
     console.error('[AI] auto-ticket creation error', err);
   }
 
-  return res.json({ reply: aiReply, usedAI, ticketCreated });
+  return res.json({ reply: aiReply, usedAI, ticketCreated, ticketId });
 });
 
 process.on('uncaughtException', (err) => {
