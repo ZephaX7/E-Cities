@@ -120,8 +120,7 @@
         msgBox.removeChild(thinking);
         if(!res.ok){ addMessage('Erreur serveur.', 'bot'); return; }
         const data = await res.json();
-        if(data && data.usedAI === false){ errBox.textContent = 'IA indisponible (clé API manquante ou erreur).'; }
-        else { errBox.textContent = ''; }
+        errBox.textContent = ''; // Clear any previous warnings
         addMessage(data.reply || 'Pas de réponse.', 'bot');
       }catch(err){
         console.error('chat error', err);

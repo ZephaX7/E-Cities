@@ -525,75 +525,58 @@ app.post('/ai/chat', async (req, res) => {
   const { username, message, history } = req.body || {};
   if(!message || !message.trim()) return res.status(400).json({ error: 'Missing message' });
 
-  const apiKey = process.env.AI_API_KEY;
-  const apiUrl = process.env.AI_API_URL || 'https://api.openai.com/v1/chat/completions';
-  const model = process.env.AI_MODEL || 'gpt-4o-mini';
-
-  function fallbackReply(){
-    return 'Je suis actuellement indisponible. Votre demande a été enregistrée et un administrateur vous répondra bientôt.';
-  }
-
-  // Build conversation messages
-  const messages = [
-    { role: 'system', content: 'Tu es l\'assistant E-cities. Aide les utilisateurs avec leurs questions sur la plateforme (projets, votes, tickets, visualisation 3D). Sois concis, amical et en français. Si un problème technique est décrit, confirme que tu le transmets aux admins.' }
-  ];
-  if(Array.isArray(history)){
-    history.forEach(h => {
-      if(h.role === 'user' || h.role === 'assistant') messages.push({ role: h.role, content: h.content });
-    });
-  }
-  messages.push({ role: 'user', content: message });
-
-  let aiReply = null;
-  let usedAI = false;
-
-  if(apiKey){
-    try{
-      const aiRes = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ model, messages, temperature: 0.7, max_tokens: 300 })
-      });
-      if(aiRes.ok){
-        const data = await aiRes.json();
-        aiReply = data.choices?.[0]?.message?.content || null;
-        if(aiReply) usedAI = true;
-      } else {
-        console.warn('AI API error', aiRes.status, await aiRes.text().catch(()=>''));
-      }
-    }catch(err){
-      console.error('ai chat error', err);
+  // Smart ticket collector mode - provides helpful responses without external AI
+  function generateSmartReply(userMessage){
+    const lower = userMessage.toLowerCase();
+    
+    // Project-related questions
+    if(/projet|project|créer|create|ajouter|add/.test(lower)){
+      return 'Pour créer un projet : allez dans la section "Projets" et cliquez sur "Nouveau projet". Vous pourrez ajouter un titre, une description et des images. Besoin d\'aide supplémentaire ? Un administrateur vous répondra sous peu.';
     }
+    
+    // Vote-related questions
+    if(/vote|voter|voting/.test(lower)){
+      return 'Pour voter : ouvrez un projet et cliquez sur le bouton de vote. Vous pouvez voter pour plusieurs projets. Vos votes sont enregistrés automatiquement.';
+    }
+    
+    // Ticket/support questions
+    if(/ticket|aide|help|support|problème|erreur|bug/.test(lower)){
+      return 'Votre demande a bien été enregistrée ! Un administrateur la traitera dans les meilleurs délais. Vous recevrez une réponse dans la section "Tickets" de votre profil.';
+    }
+    
+    // Account questions
+    if(/compte|account|profil|profile|connexion|login/.test(lower)){
+      return 'Pour gérer votre compte, allez dans votre profil (icône en haut à droite). Vous pouvez y modifier vos informations et voir vos tickets. Besoin d\'aide ? Un admin vous répondra bientôt.';
+    }
+    
+    // 3D visualization
+    if(/3d|visualisation|visualization|carte|map/.test(lower)){
+      return 'La visualisation 3D vous permet d\'explorer les projets sur une carte interactive. Cliquez sur "Visualisation" dans le menu pour y accéder.';
+    }
+    
+    // General fallback
+    return 'Merci pour votre message ! Votre demande a été transmise à notre équipe. Un administrateur vous répondra rapidement via le système de tickets.';
   }
 
-  if(!aiReply){
-    console.log('[AI] No API key or error, using fallback');
-    aiReply = fallbackReply();
-  } else {
-    console.log('[AI] Got response:', aiReply.slice(0, 60) + '...');
-  }
+  const aiReply = generateSmartReply(message);
+  const usedAI = false;
+  console.log('[AI] Smart reply mode:', aiReply.slice(0, 60) + '...');
 
-  // Auto-create ticket if user seems to describe a problem (silent)
+  // Auto-create ticket for ALL messages (smart collector mode)
   const lowerMsg = message.toLowerCase();
-  const seemsProblem = /problème|erreur|bug|panne|ne marche pas|ne fonctionne pas|impossible|bloqué|aide/.test(lowerMsg);
   let ticketCreated = false;
   const ticketUser = username || 'chatbot-anon';
-  console.log('[AI] Message check:', { username: ticketUser, seemsProblem, lowerMsg: lowerMsg.slice(0, 50) });
+  console.log('[AI] Creating ticket for:', { username: ticketUser, messagePreview: lowerMsg.slice(0, 50) });
   
-  if(seemsProblem){
-    try{
-      await ensureTicketsTable();
-      const title = '🤖 Chatbot: ' + message.slice(0,50);
-      const content = `📝 Conversation chatbot\nUtilisateur: ${ticketUser}\n\nDemande:\n${message}\n\nRéponse IA:\n${aiReply}`;
-      const result = await pool.query('INSERT INTO tickets (title, content, sender_username, status) VALUES ($1, $2, $3, $4) RETURNING id', [title, content, ticketUser, 'open']);
-      ticketCreated = true;
-      console.log('[AI] Ticket created with ID:', result.rows[0].id);
-    }catch(err){
-      console.error('[AI] auto-ticket creation error', err);
-    }
+  try{
+    await ensureTicketsTable();
+    const title = '💬 Chat: ' + message.slice(0,50);
+    const content = `💬 Message depuis le chatbot\nUtilisateur: ${ticketUser}\n\nMessage:\n${message}\n\nRéponse automatique:\n${aiReply}`;
+    const result = await pool.query('INSERT INTO tickets (title, content, sender_username, status) VALUES ($1, $2, $3, $4) RETURNING id', [title, content, ticketUser, 'open']);
+    ticketCreated = true;
+    console.log('[AI] Ticket created with ID:', result.rows[0].id);
+  }catch(err){
+    console.error('[AI] auto-ticket creation error', err);
   }
 
   return res.json({ reply: aiReply, usedAI, ticketCreated });
