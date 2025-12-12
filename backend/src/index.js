@@ -569,21 +569,29 @@ app.post('/ai/chat', async (req, res) => {
     }
   }
 
-  if(!aiReply) aiReply = fallbackReply();
+  if(!aiReply){
+    console.log('[AI] No API key or error, using fallback');
+    aiReply = fallbackReply();
+  } else {
+    console.log('[AI] Got response:', aiReply.slice(0, 60) + '...');
+  }
 
   // Auto-create ticket if user seems to describe a problem (silent)
   const lowerMsg = message.toLowerCase();
   const seemsProblem = /problème|erreur|bug|panne|ne marche pas|ne fonctionne pas|impossible|bloqué|aide/.test(lowerMsg);
   let ticketCreated = false;
+  console.log('[AI] Message check:', { username, seemsProblem, lowerMsg: lowerMsg.slice(0, 50) });
+  
   if(username && seemsProblem){
     try{
       await ensureTicketsTable();
       const title = '🤖 Chatbot: ' + message.slice(0,50);
       const content = `📝 Conversation chatbot\nUtilisateur: ${username}\n\nDemande:\n${message}\n\nRéponse IA:\n${aiReply}`;
-      await pool.query('INSERT INTO tickets (title, content, sender_username, status) VALUES ($1, $2, $3, $4)', [title, content, username, 'open']);
+      const result = await pool.query('INSERT INTO tickets (title, content, sender_username, status) VALUES ($1, $2, $3, $4) RETURNING id', [title, content, username, 'open']);
       ticketCreated = true;
+      console.log('[AI] Ticket created with ID:', result.rows[0].id);
     }catch(err){
-      console.error('auto-ticket creation error', err);
+      console.error('[AI] auto-ticket creation error', err);
     }
   }
 
