@@ -518,79 +518,76 @@ app.get('/inbox/count', async (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Backend listening on port ${PORT}`));
 
-// AI triage (chatbot) endpoint
-// POST /ai/triage { username?, title, content }
-// If AI_API_KEY is not provided, returns a simple heuristic triage.
-app.post('/ai/triage', async (req, res) => {
-  const { username, title, content } = req.body || {};
-  if(!title || !content) return res.status(400).json({ error: 'Missing title or content' });
+// AI chatbot conversation endpoint
+// POST /ai/chat { username?, message, history? }
+// If user provides a problem, AI tries to help and ticket is auto-created in background.
+app.post('/ai/chat', async (req, res) => {
+  const { username, message, history } = req.body || {};
+  if(!message || !message.trim()) return res.status(400).json({ error: 'Missing message' });
 
   const apiKey = process.env.AI_API_KEY;
   const apiUrl = process.env.AI_API_URL || 'https://api.openai.com/v1/chat/completions';
   const model = process.env.AI_MODEL || 'gpt-4o-mini';
 
-  function heuristic(){
-    const text = (title + ' ' + content).toLowerCase();
-    let category = 'Autre';
-    if(/panne|bug|erreur|404|500|crash/.test(text)) category = 'Bug';
-    else if(/idée|suggestion|amélioration|feature/.test(text)) category = 'Suggestion';
-    else if(/paiement|facture|billing|abonnement/.test(text)) category = 'Facturation';
-    else if(/sécurité|security|attaque|hack/.test(text)) category = 'Sécurité';
-    const priority = /urgent|immédiat|bloquant|critical/.test(text) ? 'Haute' : 'Normale';
-    return {
-      provider: 'heuristic',
-      category,
-      priority,
-      summary: title.slice(0,180),
-      next_actions: ['Vérifier le ticket', 'Assigner un agent', 'Répondre à l\'utilisateur']
-    };
+  function fallbackReply(){
+    return 'Je suis actuellement indisponible. Votre demande a été enregistrée et un administrateur vous répondra bientôt.';
   }
 
-  // If no API key, fallback immediately
-  if(!apiKey){
-    return res.json({ triage: heuristic(), usedAI: false });
-  }
-
-  try{
-    const prompt = `Tu es un assistant support. Catégorise et priorise le ticket ci-dessous et propose 2 prochaines actions concises en français.
-
-Titre: ${title}
-Contenu: ${content}
-
-Réponds en JSON avec les clés category, priority, summary, next_actions (liste).`;
-
-    const aiRes = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: 'system', content: 'Tu es un assistant de triage de tickets concis.' },
-          { role: 'user', content: prompt }
-        ],
-        temperature: 0.3,
-      })
+  // Build conversation messages
+  const messages = [
+    { role: 'system', content: 'Tu es l\'assistant E-cities. Aide les utilisateurs avec leurs questions sur la plateforme (projets, votes, tickets, visualisation 3D). Sois concis, amical et en français. Si un problème technique est décrit, confirme que tu le transmets aux admins.' }
+  ];
+  if(Array.isArray(history)){
+    history.forEach(h => {
+      if(h.role === 'user' || h.role === 'assistant') messages.push({ role: h.role, content: h.content });
     });
-
-    if(!aiRes.ok){
-      console.warn('AI API non-200', aiRes.status, await aiRes.text().catch(()=>''));
-      return res.json({ triage: heuristic(), usedAI: false, error: 'ai_error' });
-    }
-    const data = await aiRes.json();
-    const text = data.choices?.[0]?.message?.content || '';
-    let parsed = null;
-    try{ parsed = JSON.parse(text); }catch(_){ parsed = null; }
-    if(!parsed || !parsed.category){
-      return res.json({ triage: heuristic(), usedAI: false, error: 'parse_error' });
-    }
-    return res.json({ triage: parsed, usedAI: true });
-  }catch(err){
-    console.error('ai triage error', err);
-    return res.json({ triage: heuristic(), usedAI: false, error: 'exception' });
   }
+  messages.push({ role: 'user', content: message });
+
+  let aiReply = null;
+  let usedAI = false;
+
+  if(apiKey){
+    try{
+      const aiRes = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ model, messages, temperature: 0.7, max_tokens: 300 })
+      });
+      if(aiRes.ok){
+        const data = await aiRes.json();
+        aiReply = data.choices?.[0]?.message?.content || null;
+        if(aiReply) usedAI = true;
+      } else {
+        console.warn('AI API error', aiRes.status, await aiRes.text().catch(()=>''));
+      }
+    }catch(err){
+      console.error('ai chat error', err);
+    }
+  }
+
+  if(!aiReply) aiReply = fallbackReply();
+
+  // Auto-create ticket if user seems to describe a problem (silent)
+  const lowerMsg = message.toLowerCase();
+  const seemsProblem = /problème|erreur|bug|panne|ne marche pas|ne fonctionne pas|impossible|bloqué|aide/.test(lowerMsg);
+  let ticketCreated = false;
+  if(username && seemsProblem){
+    try{
+      await ensureTicketsTable();
+      const title = 'Conversation chatbot: ' + message.slice(0,60);
+      const content = `Demande via chatbot:\n${message}\n\nRéponse IA:\n${aiReply}`;
+      await pool.query('INSERT INTO tickets (title, content, sender_username, status) VALUES ($1, $2, $3, $4)', [title, content, username, 'open']);
+      ticketCreated = true;
+    }catch(err){
+      console.error('auto-ticket creation error', err);
+    }
+  }
+
+  return res.json({ reply: aiReply, usedAI, ticketCreated });
 });
 
 process.on('uncaughtException', (err) => {
