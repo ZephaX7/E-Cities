@@ -34,6 +34,40 @@
     return overlay;
   }
 
+  function openReplyModal(ticketId, onSend){
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal-card" style="max-width:560px">
+        <div class="modal-body">
+          <div class="modal-header" style="margin-bottom:10px">
+            <div class="modal-title">Répondre au ticket</div>
+            <button class="btn small ghost" id="replyClose">Fermer</button>
+          </div>
+          <label style="display:block;color:#c7c7c7;font-size:0.95rem">Votre réponse</label>
+          <textarea id="replyText" rows="4" style="width:100%;padding:.7rem;border-radius:10px;border:1px solid rgba(255,212,0,0.08);background:transparent;color:#fff"></textarea>
+          <div id="replyErr" style="color:#ffb3b3;font-size:0.92rem;margin-top:6px"></div>
+          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
+            <button class="btn ghost" id="replyCancel">Annuler</button>
+            <button class="btn" id="replySend">Envoyer</button>
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const close = ()=>overlay.remove();
+    overlay.addEventListener('click', (e)=>{ if(e.target === overlay) close(); });
+    overlay.querySelector('#replyClose').addEventListener('click', close);
+    overlay.querySelector('#replyCancel').addEventListener('click', close);
+    overlay.querySelector('#replySend').addEventListener('click', ()=>{
+      const msg = (overlay.querySelector('#replyText').value || '').trim();
+      const errEl = overlay.querySelector('#replyErr');
+      if(!msg){ errEl.textContent = 'Message vide'; return; }
+      errEl.textContent = '';
+      onSend(msg, close, errEl);
+    });
+    overlay.querySelector('#replyText').focus();
+  }
+
   function escapeText(str){ return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
 
   async function updateBadge(){
@@ -102,13 +136,14 @@
         const rid = e.target.getAttribute('data-id');
         const ticketId = e.target.getAttribute('data-ticket');
         if(action === 'reply'){
-          const message = (prompt('Votre réponse :') || '').trim();
-          if(!message) return;
-          try{
-            const rres = await fetch(API_BASE + '/tickets/' + encodeURIComponent(ticketId) + '/replies', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username: user.username, message }) });
-            if(!rres.ok){ showNotice('Erreur lors de l\'envoi de la réponse.', 'error'); return; }
-            showNotice('Réponse envoyée.', 'info');
-          }catch(err){ console.error('reply error', err); showNotice('Erreur lors de l\'envoi.', 'error'); }
+          openReplyModal(ticketId, async (message, closeModal, errEl)=>{
+            try{
+              const rres = await fetch(API_BASE + '/tickets/' + encodeURIComponent(ticketId) + '/replies', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username: user.username, message }) });
+              if(!rres.ok){ errEl.textContent = 'Erreur lors de l\'envoi de la réponse.'; return; }
+              showNotice('Réponse envoyée.', 'info');
+              closeModal();
+            }catch(err){ console.error('reply error', err); errEl.textContent = 'Erreur lors de l\'envoi.'; }
+          });
         } else if(action === 'delete'){
           try{
             const dres = await fetch(API_BASE + '/inbox/' + encodeURIComponent(rid) + '/delete', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username: user.username }) });

@@ -83,11 +83,12 @@
         function renderList(tickets){
           if(!tickets || tickets.length === 0){ listEl.innerHTML = '<div style="color:#ddd">Aucun ticket</div>'; return; }
           const out = tickets.map(t => {
+            const userReplyBadge = t.has_user_reply ? '<span class="pill" style="margin-left:8px;background:#ffd400;color:#000;padding:2px 8px;border-radius:999px;font-weight:800;font-size:0.85rem;">Réponse utilisateur</span>' : '';
             return `
               <div class="card" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
                 <div>
                   <div style="font-weight:800;color:var(--accent)">${t.title}</div>
-                  <div style="color:#ddd;font-size:0.9rem">de <strong>${t.sender_username}</strong> — ${new Date(t.created_at).toLocaleString()}</div>
+                  <div style="color:#ddd;font-size:0.9rem">de <strong>${t.sender_username}</strong> — ${new Date(t.created_at).toLocaleString()} ${userReplyBadge}</div>
                 </div>
                 <div style="display:flex;gap:8px;align-items:center">
                   <button class="btn small" data-id="${t.id}" data-action="view">Voir</button>

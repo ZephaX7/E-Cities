@@ -268,7 +268,15 @@ app.get('/tickets', async (req, res) => {
     const userRow = u.rows[0];
     const isAdmin = userRow.role === 'Admin' || (userRow.admin_expires && new Date(userRow.admin_expires) > new Date());
     if(!isAdmin) return res.status(403).json({ error: 'Forbidden' });
-    const rows = await pool.query('SELECT id, title, sender_username, status, created_at FROM tickets ORDER BY created_at DESC');
+    const rows = await pool.query(`
+      SELECT t.id, t.title, t.sender_username, t.status, t.created_at,
+             EXISTS (
+               SELECT 1 FROM ticket_replies r
+               WHERE r.ticket_id = t.id AND COALESCE(r.sender_role, 'Admin') = 'User' AND r.user_deleted = FALSE
+             ) AS has_user_reply
+      FROM tickets t
+      ORDER BY t.created_at DESC
+    `);
     return res.json({ tickets: rows.rows });
   }catch(err){ console.error('list tickets error', err); return res.status(500).json({ error: 'Server error' }); }
 });
