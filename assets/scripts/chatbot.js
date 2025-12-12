@@ -32,8 +32,8 @@
       <div class="chatbot-input">
         <input id="cbUserMsg" type="text" placeholder="Votre message..." />
         <button class="btn" id="cbSend">Envoyer</button>
-        <div class="chatbot-err" id="cbErr"></div>
       </div>
+      <div class="chatbot-err" id="cbErr"></div>
     `;
 
     document.body.appendChild(btn);
@@ -50,7 +50,7 @@
       if(panel.classList.contains('open')){
         inputEl.focus();
         if(conversationHistory.length === 0){
-          addMessage('Bonjour ! Comment puis-je vous aider aujourd'hui ?', 'bot');
+          addMessage('Bonjour ! Comment puis-je vous aider aujourd\'hui ?', 'bot');
         }
       }
     }
