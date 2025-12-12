@@ -580,14 +580,15 @@ app.post('/ai/chat', async (req, res) => {
   const lowerMsg = message.toLowerCase();
   const seemsProblem = /problème|erreur|bug|panne|ne marche pas|ne fonctionne pas|impossible|bloqué|aide/.test(lowerMsg);
   let ticketCreated = false;
-  console.log('[AI] Message check:', { username, seemsProblem, lowerMsg: lowerMsg.slice(0, 50) });
+  const ticketUser = username || 'chatbot-anon';
+  console.log('[AI] Message check:', { username: ticketUser, seemsProblem, lowerMsg: lowerMsg.slice(0, 50) });
   
-  if(username && seemsProblem){
+  if(seemsProblem){
     try{
       await ensureTicketsTable();
       const title = '🤖 Chatbot: ' + message.slice(0,50);
-      const content = `📝 Conversation chatbot\nUtilisateur: ${username}\n\nDemande:\n${message}\n\nRéponse IA:\n${aiReply}`;
-      const result = await pool.query('INSERT INTO tickets (title, content, sender_username, status) VALUES ($1, $2, $3, $4) RETURNING id', [title, content, username, 'open']);
+      const content = `📝 Conversation chatbot\nUtilisateur: ${ticketUser}\n\nDemande:\n${message}\n\nRéponse IA:\n${aiReply}`;
+      const result = await pool.query('INSERT INTO tickets (title, content, sender_username, status) VALUES ($1, $2, $3, $4) RETURNING id', [title, content, ticketUser, 'open']);
       ticketCreated = true;
       console.log('[AI] Ticket created with ID:', result.rows[0].id);
     }catch(err){

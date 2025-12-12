@@ -35,7 +35,10 @@
     panel.innerHTML = `
       <div class="chatbot-header">
         <div class="chatbot-title">Assistant E-cities</div>
-        <button class="chatbot-close" aria-label="Fermer">✕</button>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn ghost" id="cbReset" type="button">Nouveau chat</button>
+          <button class="chatbot-close" aria-label="Fermer">✕</button>
+        </div>
       </div>
       <div class="chatbot-body">
         <div class="chatbot-hint">Posez votre question, l'assistant vous aide instantanément.</div>
@@ -52,6 +55,7 @@
     document.body.appendChild(panel);
 
     const closeBtn = panel.querySelector('.chatbot-close');
+    const resetBtn = panel.querySelector('#cbReset');
     const sendBtn = panel.querySelector('#cbSend');
     const msgBox = panel.querySelector('#cbMessages');
     const errBox = panel.querySelector('#cbErr');
@@ -68,6 +72,13 @@
       msgBox.scrollTop = msgBox.scrollHeight;
     }
 
+    function resetChat(){
+      conversationHistory = [];
+      saveHistory(conversationHistory);
+      msgBox.innerHTML = '';
+      addMessage('Bonjour ! Comment puis-je vous aider aujourd\'hui ?', 'bot');
+    }
+
     function toggle(){
       panel.classList.toggle('open');
       if(panel.classList.contains('open')){
@@ -79,6 +90,7 @@
     }
     btn.addEventListener('click', toggle);
     closeBtn.addEventListener('click', toggle);
+    resetBtn.addEventListener('click', ()=>{ resetChat(); inputEl.focus(); });
 
     function addMessage(text, from){
       const el = document.createElement('div');
@@ -108,6 +120,8 @@
         msgBox.removeChild(thinking);
         if(!res.ok){ addMessage('Erreur serveur.', 'bot'); return; }
         const data = await res.json();
+        if(data && data.usedAI === false){ errBox.textContent = 'IA indisponible (clé API manquante ou erreur).'; }
+        else { errBox.textContent = ''; }
         addMessage(data.reply || 'Pas de réponse.', 'bot');
       }catch(err){
         console.error('chat error', err);
