@@ -69,6 +69,11 @@ async function ensureUsersTable(){
     // ensure role column exists for older DBs
     await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'User'");
     await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS admin_expires TIMESTAMP NULL");
+    // profile fields
+    await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS first_name TEXT");
+    await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_name TEXT");
+    await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS gender TEXT");
+    await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT");
   }catch(err){ console.error('ensureUsersTable error', err); }
 }
 
@@ -500,6 +505,33 @@ app.post('/inbox/:id/delete', async (req, res) => {
     await pool.query('UPDATE ticket_replies SET user_deleted = TRUE, is_read = TRUE WHERE id = $1', [id]);
     return res.json({ deleted: true });
   }catch(err){ console.error('inbox delete error', err); return res.status(500).json({ error: 'Server error' }); }
+});
+
+// Get user profile
+app.get('/profile', async (req, res) => {
+  const username = req.query.username;
+  if(!username) return res.status(400).json({ error: 'Missing username' });
+  try{
+    await ensureUsersTable();
+    const result = await pool.query('SELECT username, role, admin_expires, created_at, first_name, last_name, gender, email FROM users WHERE username = $1 LIMIT 1', [username]);
+    if(result.rowCount === 0) return res.status(404).json({ error: 'User not found' });
+    return res.json({ profile: result.rows[0] });
+  }catch(err){ console.error('get profile error', err); return res.status(500).json({ error: 'Server error' }); }
+});
+
+// Update user profile
+app.post('/profile', async (req, res) => {
+  const { username, first_name, last_name, gender, email } = req.body || {};
+  if(!username) return res.status(400).json({ error: 'Missing username' });
+  try{
+    await ensureUsersTable();
+    const result = await pool.query(
+      'UPDATE users SET first_name = $1, last_name = $2, gender = $3, email = $4 WHERE username = $5 RETURNING username, role, admin_expires, created_at, first_name, last_name, gender, email',
+      [first_name || null, last_name || null, gender || null, email || null, username]
+    );
+    if(result.rowCount === 0) return res.status(404).json({ error: 'User not found' });
+    return res.json({ profile: result.rows[0], updated: true });
+  }catch(err){ console.error('update profile error', err); return res.status(500).json({ error: 'Server error' }); }
 });
 
 // User inbox: unread count only

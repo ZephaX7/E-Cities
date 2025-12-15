@@ -56,17 +56,45 @@
                   <div id="profile-account" style="font-size:0.95rem;color:var(--muted)">Nom de compte</div>
                   <div id="p-username" style="margin-top:.4rem;font-weight:800;color:var(--accent);font-size:1.25rem">—</div>
                   <div style="margin-top:.6rem;color:#ddd"><span id="profile-role">Rôle</span> : <span id="p-role">—</span></div>
+                  <div style="margin-top:.4rem;color:#aaa;font-size:0.9rem"><span id="profile-member-since">Membre depuis</span> : <span id="p-created">—</span></div>
                 </div>
           </div>
 
           <div style="flex:2;min-width:260px">
             <div class="boxed" style="padding:1rem">
-              <h3 style="margin-top:0;color:var(--accent)" id="profile-title">Profil utilisateur</h3>
-              <p id="p-bio" style="color:#e9e9e9">Aucune information supplémentaire.</p>
-              <div style="margin-top:1rem;display:flex;gap:.6rem;align-items:center">
-                <button id="logout-btn" class="btn">Se déconnecter</button>
-                <button id="admin-btn" class="btn" style="display:none;margin-left:.5rem">Admin</button>
+              <h3 style="margin-top:0;color:var(--accent)" id="profile-title">Informations personnelles</h3>
+              
+              <div style="margin-bottom:1rem">
+                <label style="display:block;color:var(--muted);margin-bottom:.4rem;font-size:0.9rem">Prénom (optionnel)</label>
+                <input id="profile-firstname" type="text" placeholder="Votre prénom" style="width:100%;padding:.6rem;border-radius:8px;border:1px solid rgba(255,212,0,0.08);background:transparent;color:#fff" />
               </div>
+
+              <div style="margin-bottom:1rem">
+                <label style="display:block;color:var(--muted);margin-bottom:.4rem;font-size:0.9rem">Nom (optionnel)</label>
+                <input id="profile-lastname" type="text" placeholder="Votre nom" style="width:100%;padding:.6rem;border-radius:8px;border:1px solid rgba(255,212,0,0.08);background:transparent;color:#fff" />
+              </div>
+
+              <div style="margin-bottom:1rem">
+                <label style="display:block;color:var(--muted);margin-bottom:.4rem;font-size:0.9rem">Sexe (optionnel)</label>
+                <select id="profile-gender" style="width:100%;padding:.6rem;border-radius:8px;border:1px solid rgba(255,212,0,0.08);background:#0b0b0b;color:#fff">
+                  <option value="">Non spécifié</option>
+                  <option value="Homme">Homme</option>
+                  <option value="Femme">Femme</option>
+                  <option value="Autre">Autre</option>
+                </select>
+              </div>
+
+              <div style="margin-bottom:1rem">
+                <label style="display:block;color:var(--muted);margin-bottom:.4rem;font-size:0.9rem">Email (optionnel)</label>
+                <input id="profile-email" type="email" placeholder="votre@email.com" style="width:100%;padding:.6rem;border-radius:8px;border:1px solid rgba(255,212,0,0.08);background:transparent;color:#fff" />
+              </div>
+
+              <div style="margin-top:1rem;display:flex;gap:.6rem;align-items:center;flex-wrap:wrap">
+                <button id="save-profile-btn" class="btn">Enregistrer</button>
+                <button id="logout-btn" class="btn">Se déconnecter</button>
+                <button id="admin-btn" class="btn" style="display:none">Admin</button>
+              </div>
+              <div id="profile-msg" style="margin-top:.6rem;color:#e9e9e9"></div>
             </div>
             <div class="boxed" style="margin-top:1rem;padding:1rem" id="ticketBox">
               <h3 style="margin:0 0 .6rem;color:var(--accent)">Envoyer un ticket</h3>
@@ -110,15 +138,63 @@
 
       if(!user){
         document.getElementById('p-username').textContent = 'Non connecté';
-        document.getElementById('p-bio').textContent = 'Connectez-vous pour voir les informations de votre profil.';
         document.getElementById('p-role').textContent = '—';
+        document.getElementById('p-created').textContent = '—';
       } else {
         document.getElementById('p-username').textContent = user.username || '—';
-        // show member since if available
-        if(user.created_at) document.getElementById('p-bio').textContent = 'Membre depuis ' + new Date(user.created_at).toLocaleDateString();
-        else if(user.email) document.getElementById('p-bio').textContent = user.email;
-        // role (may have been toggled locally)
         document.getElementById('p-role').textContent = user.role || 'User';
+        
+        // Load full profile from backend
+        (async function(){
+          try{
+            const res = await fetch(API_BASE + '/profile?username=' + encodeURIComponent(user.username));
+            if(!res.ok) return;
+            const data = await res.json();
+            const profile = data.profile;
+            
+            // Display created date
+            if(profile.created_at){
+              const date = new Date(profile.created_at);
+              document.getElementById('p-created').textContent = date.toLocaleDateString('fr-FR');
+            }
+            
+            // Fill form fields
+            document.getElementById('profile-firstname').value = profile.first_name || '';
+            document.getElementById('profile-lastname').value = profile.last_name || '';
+            document.getElementById('profile-gender').value = profile.gender || '';
+            document.getElementById('profile-email').value = profile.email || '';
+          }catch(err){
+            console.error('load profile error', err);
+          }
+        })();
+      }
+
+      // Save profile button
+      const saveProfileBtn = document.getElementById('save-profile-btn');
+      if(saveProfileBtn){
+        saveProfileBtn.addEventListener('click', async function(){
+          const user = getUser();
+          if(!user || !user.username){ showSitePopup('Veuillez vous connecter.', 'info'); return; }
+          
+          const first_name = document.getElementById('profile-firstname').value.trim();
+          const last_name = document.getElementById('profile-lastname').value.trim();
+          const gender = document.getElementById('profile-gender').value;
+          const email = document.getElementById('profile-email').value.trim();
+          
+          try{
+            const res = await fetch(API_BASE + '/profile', {
+              method: 'POST',
+              headers: {'Content-Type':'application/json'},
+              body: JSON.stringify({ username: user.username, first_name, last_name, gender, email })
+            });
+            if(!res.ok){ showSitePopup('Erreur lors de la sauvegarde.', 'error'); return; }
+            await res.json();
+            showSitePopup('Profil enregistré !', 'success');
+          }catch(err){
+            console.error('save profile error', err);
+            showSitePopup('Impossible de contacter le serveur.', 'error');
+          }
+        });
       }
 
       // Listen for Ctrl+Alt+J to request admin password before toggling Admin role
