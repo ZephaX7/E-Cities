@@ -114,6 +114,8 @@
     <script src="../../assets/scripts/auth.js"></script>
     <script src="../../assets/scripts/inbox.js"></script>
     <script src="../../assets/scripts/chatbot.js"></script>
+    <script src="../../assets/scripts/footer.js"></script>
+    <script src="../../assets/scripts/projects.js"></script>
     <script>
       // Voting: require login, call server API for persistence, fallback to localStorage if API fails
       (function(){
@@ -227,7 +229,7 @@
           el._t = setTimeout(()=>{ el.classList.remove('pulse'); }, 360);
         }
 
-        document.addEventListener('DOMContentLoaded', function(){
+        async function initVoting(){
           document.querySelectorAll('.project-card').forEach(async function(card){
             const pid = card.getAttribute('data-project-id');
             const btn = card.querySelector('.vote-btn');
@@ -276,7 +278,10 @@
               }
             });
           });
-        });
+        }
+
+        document.addEventListener('DOMContentLoaded', initVoting);
+        window.addEventListener('ecities:projects-rendered', initVoting);
       })();
     </script>
   </body>

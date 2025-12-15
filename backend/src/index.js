@@ -133,6 +133,36 @@ async function ensureVotesTable(){
   }catch(err){ console.error('ensureVotesTable error', err); }
 }
 
+// Ensure projects table exists helper
+async function ensureProjectsTable(){
+  try{
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS projects (
+        id SERIAL PRIMARY KEY,
+        slug TEXT UNIQUE NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT,
+        end_date DATE,
+        image_url TEXT,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+  }catch(err){ console.error('ensureProjectsTable error', err); }
+}
+
+async function isAdminUser(username){
+  if(!username) return false;
+  try{
+    await ensureUsersTable();
+    const u = await pool.query('SELECT role, admin_expires FROM users WHERE username = $1 LIMIT 1', [username]);
+    if(u.rowCount === 0) return false;
+    const row = u.rows[0];
+    return row.role === 'Admin' || (row.admin_expires && new Date(row.admin_expires) > new Date());
+  }catch(err){ console.error('isAdminUser error', err); return false; }
+}
+
 // Get vote count for a project
 app.get('/votes/:projectId', async (req, res) => {
   const projectId = req.params.projectId;
@@ -248,6 +278,92 @@ app.get('/debug/status', async (req, res) => {
     const recent = await pool.query('SELECT v.id, u.username, v.project_id, v.created_at FROM votes v JOIN users u ON u.id = v.user_id ORDER BY v.created_at DESC LIMIT 20');
     return res.json({ counts: rows.rows, recent: recent.rows });
   }catch(err){ console.error('debug status error', err); return res.status(500).json({ error: 'Server error' }); }
+});
+
+// Projects CRUD
+// List projects with vote counts
+app.get('/projects', async (req, res) => {
+  try{
+    await ensureProjectsTable();
+    await ensureVotesTable();
+    const rows = await pool.query(`
+      SELECT p.slug, p.title, COALESCE(p.description,'') AS description,
+             p.end_date, p.image_url, p.is_active,
+             COALESCE(v.cnt, 0)::int AS votes
+      FROM projects p
+      LEFT JOIN (
+        SELECT project_id AS slug, COUNT(*) AS cnt
+        FROM votes
+        GROUP BY project_id
+      ) v ON v.slug = p.slug
+      WHERE p.is_active = TRUE
+      ORDER BY p.created_at DESC
+    `);
+    return res.json({ projects: rows.rows });
+  }catch(err){ console.error('list projects error', err); return res.status(500).json({ error: 'Server error' }); }
+});
+
+// Admin: create project
+app.post('/projects', async (req, res) => {
+  const { username, slug, title, description, end_date, image_url, is_active } = req.body || {};
+  if(!username) return res.status(400).json({ error: 'Missing username' });
+  if(!slug || !title) return res.status(400).json({ error: 'Missing slug or title' });
+  try{
+    if(!await isAdminUser(username)) return res.status(403).json({ error: 'Forbidden' });
+    await ensureProjectsTable();
+    const insert = await pool.query(
+      `INSERT INTO projects (slug, title, description, end_date, image_url, is_active)
+       VALUES ($1,$2,$3,$4,$5,COALESCE($6, TRUE))
+       RETURNING slug, title, description, end_date, image_url, is_active, created_at, updated_at`,
+      [slug, title, description || null, end_date || null, image_url || null, typeof is_active === 'boolean' ? is_active : true]
+    );
+    return res.json({ project: insert.rows[0], created: true });
+  }catch(err){
+    console.error('create project error', err);
+    if(err && err.code === '23505') return res.status(409).json({ error: 'Slug already exists' });
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Admin: update project by slug
+app.put('/projects/:slug', async (req, res) => {
+  const slug = req.params.slug;
+  const { username, title, description, end_date, image_url, is_active } = req.body || {};
+  if(!username) return res.status(400).json({ error: 'Missing username' });
+  try{
+    if(!await isAdminUser(username)) return res.status(403).json({ error: 'Forbidden' });
+    await ensureProjectsTable();
+    const result = await pool.query(
+      `UPDATE projects SET
+        title = COALESCE($1, title),
+        description = COALESCE($2, description),
+        end_date = COALESCE($3, end_date),
+        image_url = COALESCE($4, image_url),
+        is_active = COALESCE($5, is_active),
+        updated_at = NOW()
+       WHERE slug = $6
+       RETURNING slug, title, description, end_date, image_url, is_active, created_at, updated_at`,
+      [title || null, description || null, end_date || null, image_url || null, (typeof is_active === 'boolean') ? is_active : null, slug]
+    );
+    if(result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    return res.json({ project: result.rows[0], updated: true });
+  }catch(err){ console.error('update project error', err); return res.status(500).json({ error: 'Server error' }); }
+});
+
+// Admin: delete project by slug (and related votes)
+app.delete('/projects/:slug', async (req, res) => {
+  const slug = req.params.slug;
+  const { username } = req.body || {};
+  if(!username) return res.status(400).json({ error: 'Missing username' });
+  try{
+    if(!await isAdminUser(username)) return res.status(403).json({ error: 'Forbidden' });
+    await ensureProjectsTable();
+    await ensureVotesTable();
+    // remove votes first to keep data consistent
+    await pool.query('DELETE FROM votes WHERE project_id = $1', [slug]);
+    const del = await pool.query('DELETE FROM projects WHERE slug = $1', [slug]);
+    return res.json({ deleted: del.rowCount > 0 });
+  }catch(err){ console.error('delete project error', err); return res.status(500).json({ error: 'Server error' }); }
 });
 
 // Tickets endpoints
