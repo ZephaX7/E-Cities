@@ -63,9 +63,9 @@
       </section>
     </main>
     <script type="module">
-      import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js';
-      import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/controls/OrbitControls.js';
-      import { IFCLoader } from 'https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/loaders/IFCLoader.js';
+      import * as THREE from 'https://cdn.skypack.dev/three@0.152.2';
+      import { OrbitControls } from 'https://cdn.skypack.dev/three@0.152.2/examples/jsm/controls/OrbitControls.js';
+      import { IFCLoader } from 'https://cdn.skypack.dev/web-ifc-three@0.0.122/IFCLoader.js';
 
       document.addEventListener('DOMContentLoaded', () => {
         const API_BASE = (document.querySelector('meta[name="api-base"]')?.content || 'http://localhost:3000').replace(/\/$/, '');
@@ -118,7 +118,7 @@
         const ground = new THREE.Mesh(new THREE.PlaneGeometry(200,200), new THREE.MeshStandardMaterial({ color:0x0b0f16, roughness:0.95 })); ground.rotation.x = -Math.PI/2; ground.position.y = -0.01; scene.add(ground);
 
         const loader = new IFCLoader();
-        loader.ifcManager.setWasmPath('https://cdn.jsdelivr.net/npm/web-ifc@0.0.44/');
+        loader.ifcManager.setWasmPath('https://unpkg.com/web-ifc@0.0.44/');
 
         // Add a simple cube to verify 3D works while IFC loads
         const testCube = new THREE.Mesh(
