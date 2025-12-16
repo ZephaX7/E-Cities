@@ -120,6 +120,15 @@
         const loader = new IFCLoader();
         loader.ifcManager.setWasmPath('https://cdn.jsdelivr.net/npm/web-ifc@0.0.44/');
 
+        // Add a simple cube to verify 3D works while IFC loads
+        const testCube = new THREE.Mesh(
+          new THREE.BoxGeometry(1,1,1),
+          new THREE.MeshStandardMaterial({ color:0x4488ff, roughness:0.5 })
+        );
+        testCube.position.set(0,0.5,0);
+        testCube.castShadow = true;
+        scene.add(testCube);
+
         function onWindowResize(){
           const w = container.clientWidth || container.parentElement.clientWidth || 800;
           const h = container.clientHeight || 400;
@@ -145,15 +154,19 @@
 
         async function loadIFCBuffer(buffer, label){
           try{
+            console.log('[IFC] Starting parse...', label);
             loader.parse(buffer, '', (model)=>{
+              console.log('[IFC] Model parsed successfully', model);
               clearModel();
               currentModel = model;
               scene.add(model);
+              // Remove test cube when IFC loads
+              if(testCube && scene.children.includes(testCube)) scene.remove(testCube);
               fitCameraToObject(model);
               showMsg('Modèle chargé : ' + (label || 'IFC'), 'info');
               overlay && overlay.classList.add('hidden');
-            }, (err)=>{ console.error('IFC parse error', err); showError('Echec du chargement IFC. Vérifiez le fichier.'); });
-          }catch(err){ console.error(err); showError('Echec du chargement IFC. Vérifiez le fichier ou réessayez.'); }
+            }, (err)=>{ console.error('[IFC] Parse error', err); showError('Echec du chargement IFC. Vérifiez le fichier.'); });
+          }catch(err){ console.error('[IFC] Load error', err); showError('Echec du chargement IFC. Vérifiez le fichier ou réessayez.'); }
         }
 
         async function loadIFCFile(file){
@@ -169,12 +182,15 @@
 
         async function loadIFCUrl(url){
           try{
+            console.log('[IFC] Fetching from', url);
             showMsg('Chargement du modèle par défaut...', 'info');
             const res = await fetch(url);
+            console.log('[IFC] Fetch response', res.status, res.ok);
             if(!res.ok) throw new Error('HTTP ' + res.status);
             const buffer = await res.arrayBuffer();
+            console.log('[IFC] Buffer loaded, size:', buffer.byteLength);
             await loadIFCBuffer(buffer, url.split('/').pop());
-          }catch(err){ console.error('IFC default load error', err); showError('Impossible de charger le modèle IFC par défaut.'); }
+          }catch(err){ console.error('[IFC] Default load error', err); showError('Impossible de charger le modèle IFC par défaut. Cube de test affiché.'); }
         }
 
         function handleFiles(files){
