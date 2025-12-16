@@ -62,10 +62,198 @@
         <div class="drop-hint">Glissez-déposez un fichier <strong>.ifc</strong> ou utilisez le bouton pour le charger. La scène s'adapte automatiquement à votre modèle.</div>
       </section>
     </main>
-    <script type="module">
-      import * as THREE from 'https://cdn.skypack.dev/three@0.152.2';
-      import { OrbitControls } from 'https://cdn.skypack.dev/three@0.152.2/examples/jsm/controls/OrbitControls.js';
-      import { IFCLoader } from 'https://cdn.skypack.dev/web-ifc-three@0.0.122/IFCLoader.js';
+    <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
+    <script src="../../assets/scripts/i18n.js"></script>
+    <script src="../../assets/scripts/auth.js"></script>
+    <script src="../../assets/scripts/inbox.js"></script>
+    <script src="../../assets/scripts/chatbot.js"></script>
+    <script src="../../assets/scripts/footer.js"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        const container = document.getElementById('viewer');
+        const overlay = document.getElementById('viewerOverlay');
+        const resetBtn = document.getElementById('resetView');
+        const msgEl = document.getElementById('vizMsg');
+
+        function showMsg(text, type='info'){ if(!msgEl) return; msgEl.textContent = text || ''; msgEl.className = 'auth-msg ' + type; }
+
+        if(!window.THREE){ showMsg('Impossible de charger Three.js', 'error'); return; }
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0d1117);
+        
+        const renderer = new THREE.WebGLRenderer({ antialias:true });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        container.appendChild(renderer.domElement);
+
+        const camera = new THREE.PerspectiveCamera(45, 2, 0.1, 1000);
+        camera.position.set(5, 3, 8);
+
+        // Lumières
+        const hemi = new THREE.HemisphereLight(0xffffff, 0x222222, 0.9);
+        hemi.position.set(0,2,0);
+        scene.add(hemi);
+        
+        const dir = new THREE.DirectionalLight(0xffffff, 0.8);
+        dir.position.set(10,20,10);
+        scene.add(dir);
+
+        // Sol
+        const ground = new THREE.Mesh(
+          new THREE.PlaneGeometry(200,200),
+          new THREE.MeshStandardMaterial({ color:0x0b0f16, roughness:0.95 })
+        );
+        ground.rotation.x = -Math.PI/2;
+        ground.position.y = -0.01;
+        scene.add(ground);
+
+        // Cube de démo
+        const cube = new THREE.Mesh(
+          new THREE.BoxGeometry(2,2,2),
+          new THREE.MeshStandardMaterial({ color:0x4488ff, roughness:0.5 })
+        );
+        cube.position.set(0,1,0);
+        scene.add(cube);
+
+        // Contrôles souris simples
+        let isDragging = false, lastX = 0, lastY = 0;
+        let rotY = 0, rotX = 0;
+
+        renderer.domElement.addEventListener('mousedown', (e)=>{
+          isDragging = true; lastX = e.clientX; lastY = e.clientY;
+        });
+        window.addEventListener('mousemove', (e)=>{
+          if(!isDragging) return;
+          const dx = e.clientX - lastX, dy = e.clientY - lastY;
+          lastX = e.clientX; lastY = e.clientY;
+          rotY -= dx * 0.005; rotX -= dy * 0.005;
+          rotX = Math.max(-Math.PI/3, Math.min(Math.PI/3, rotX));
+        });
+        window.addEventListener('mouseup', ()=>{ isDragging = false; });
+
+        renderer.domElement.addEventListener('wheel', (e)=>{
+          e.preventDefault();
+          const d = e.deltaY * 0.01;
+          camera.position.z = Math.max(3, Math.min(20, camera.position.z + d));
+        });
+
+        function onWindowResize(){
+          const w = container.clientWidth || 800, h = container.clientHeight || 400;
+          camera.aspect = w/h; camera.updateProjectionMatrix(); renderer.setSize(w,h);
+        }
+        window.addEventListener('resize', onWindowResize);
+        onWindowResize();
+
+        resetBtn.addEventListener('click', ()=>{
+          camera.position.set(5,3,8); rotX = 0; rotY = 0;
+        });
+
+        overlay.classList.add('hidden');
+        showMsg('Viewer 3D actif - Cube de démonstration', 'info');
+
+        function animate(){
+          requestAnimationFrame(animate);
+          camera.position.x = Math.cos(rotY) * Math.abs(camera.position.z);
+          camera.position.y = 3 + Math.sin(rotX) * 5;
+          camera.lookAt(0,1,0);
+          cube.rotation.y += 0.005;
+          renderer.render(scene, camera);
+        }
+        animate();
+      });
+    </script>
+   </body>
+ </html>
+        const msgEl = document.getElementById('vizMsg');
+
+        function showMsg(text, type='info'){ if(!msgEl) return; msgEl.textContent = text || ''; msgEl.className = 'auth-msg ' + type; }
+
+        if(!window.THREE){ showMsg('Impossible de charger Three.js', 'error'); return; }
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0d1117);
+        
+        const renderer = new THREE.WebGLRenderer({ antialias:true });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        container.appendChild(renderer.domElement);
+
+        const camera = new THREE.PerspectiveCamera(45, 2, 0.1, 1000);
+        camera.position.set(5, 3, 8);
+
+        // Lumières
+        const hemi = new THREE.HemisphereLight(0xffffff, 0x222222, 0.9);
+        hemi.position.set(0,2,0);
+        scene.add(hemi);
+        
+        const dir = new THREE.DirectionalLight(0xffffff, 0.8);
+        dir.position.set(10,20,10);
+        scene.add(dir);
+
+        // Sol
+        const ground = new THREE.Mesh(
+          new THREE.PlaneGeometry(200,200),
+          new THREE.MeshStandardMaterial({ color:0x0b0f16, roughness:0.95 })
+        );
+        ground.rotation.x = -Math.PI/2;
+        ground.position.y = -0.01;
+        scene.add(ground);
+
+        // Cube de démo
+        const cube = new THREE.Mesh(
+          new THREE.BoxGeometry(2,2,2),
+          new THREE.MeshStandardMaterial({ color:0x4488ff, roughness:0.5 })
+        );
+        cube.position.set(0,1,0);
+        scene.add(cube);
+
+        // Contrôles souris simples
+        let isDragging = false, lastX = 0, lastY = 0;
+        let rotY = 0, rotX = 0;
+
+        renderer.domElement.addEventListener('mousedown', (e)=>{
+          isDragging = true; lastX = e.clientX; lastY = e.clientY;
+        });
+        window.addEventListener('mousemove', (e)=>{
+          if(!isDragging) return;
+          const dx = e.clientX - lastX, dy = e.clientY - lastY;
+          lastX = e.clientX; lastY = e.clientY;
+          rotY -= dx * 0.005; rotX -= dy * 0.005;
+          rotX = Math.max(-Math.PI/3, Math.min(Math.PI/3, rotX));
+        });
+        window.addEventListener('mouseup', ()=>{ isDragging = false; });
+
+        renderer.domElement.addEventListener('wheel', (e)=>{
+          e.preventDefault();
+          const d = e.deltaY * 0.01;
+          camera.position.z = Math.max(3, Math.min(20, camera.position.z + d));
+        });
+
+        function onWindowResize(){
+          const w = container.clientWidth || 800, h = container.clientHeight || 400;
+          camera.aspect = w/h; camera.updateProjectionMatrix(); renderer.setSize(w,h);
+        }
+        window.addEventListener('resize', onWindowResize);
+        onWindowResize();
+
+        resetBtn.addEventListener('click', ()=>{
+          camera.position.set(5,3,8); rotX = 0; rotY = 0;
+        });
+
+        overlay.classList.add('hidden');
+        showMsg('Viewer 3D actif - Cube de démonstration', 'info');
+
+        function animate(){
+          requestAnimationFrame(animate);
+          camera.position.x = Math.cos(rotY) * camera.position.z;
+          camera.position.y = 3 + Math.sin(rotX) * 5;
+          camera.position.z = Math.sin(rotY) * camera.position.z;
+          camera.lookAt(0,1,0);
+          cube.rotation.y += 0.005;
+          renderer.render(scene, camera);
+        }
+        animate();
+      });
+    </script>
 
       document.addEventListener('DOMContentLoaded', () => {
         const API_BASE = (document.querySelector('meta[name="api-base"]')?.content || 'http://localhost:3000').replace(/\/$/, '');
