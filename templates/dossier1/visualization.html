@@ -81,6 +81,16 @@
         function showMsg(text, type='info'){ if(!msgEl) return; msgEl.textContent = text || ''; msgEl.className = 'auth-msg ' + type; }
         function showError(text){ showMsg(text || 'Erreur de chargement.', 'error'); console.error(text); }
 
+        // Avoid browser navigating to the IFC file when dropped anywhere on the page
+        window.addEventListener('dragover', (e)=>{ e.preventDefault(); });
+        window.addEventListener('drop', (e)=>{
+          e.preventDefault();
+          if(!isAdmin){ showMsg('Chargement IFC réservé aux administrateurs.', 'info'); return; }
+          const files = e.dataTransfer && e.dataTransfer.files;
+          const isInsideViewer = e.target && container.contains(e.target);
+          if(isInsideViewer) handleFiles(files);
+        });
+
         // WebGL support check
         try{
           const canvas = document.createElement('canvas');
