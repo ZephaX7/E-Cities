@@ -3,33 +3,6 @@
   const metaApi = document.querySelector('meta[name="api-base"]');
   const API_BASE = (metaApi && metaApi.content) ? metaApi.content.replace(/\/$/, '') : 'http://localhost:3000';
 
-  const defaultProjects = [
-    {
-      slug: 'place-centrale',
-      title: 'Revitalisation de la place centrale',
-      end_date: '2026-03-15',
-      image_url: 'https://images.unsplash.com/photo-1508921912186-1d1a45ebb3c1?q=80&w=1200',
-      votes: 0,
-      is_active: true
-    },
-    {
-      slug: 'piste-cyclable',
-      title: "Aménagement d'une piste cyclable",
-      end_date: '2026-08-01',
-      image_url: 'https://images.unsplash.com/photo-1505842465776-3f3f9b4f3df4?q=80&w=1200',
-      votes: 0,
-      is_active: true
-    },
-    {
-      slug: 'jardin-partage',
-      title: 'Jardin partagé et compost',
-      end_date: '2025-09-30',
-      image_url: 'https://images.unsplash.com/photo-1496307042754-b4aa456c4a2d?q=80&w=1200',
-      votes: 0,
-      is_active: true
-    }
-  ];
-
   function getUser(){ try{ return JSON.parse(localStorage.getItem('ecities_user')); }catch(e){ return null; } }
   function isAdmin(){ const u = getUser(); return !!(u && (u.role === 'Admin')); }
   function fmtDateISOToFR(d){ if(!d) return '—'; try{ const dt = new Date(d); const dd = String(dt.getDate()).padStart(2,'0'); const mm = String(dt.getMonth()+1).padStart(2,'0'); const yyyy = dt.getFullYear(); return `${dd}/${mm}/${yyyy}`; }catch(e){ return '—'; } }
@@ -41,13 +14,6 @@
       const data = await res.json();
       return Array.isArray(data.projects) ? data.projects : [];
     }catch(err){ console.error('fetchProjects error', err); return []; }
-  }
-
-  function mergeWithDefaults(serverProjects){
-    const map = new Map();
-    defaultProjects.forEach(p => map.set(p.slug, { ...p }));
-    (serverProjects || []).forEach(p => map.set(p.slug, { ...p }));
-    return Array.from(map.values());
   }
 
   function renderCards(projects){
@@ -173,7 +139,7 @@
     async function refresh(){
       const projects = await fetchProjects();
       buildAdminPanel(projects);
-      renderCards(mergeWithDefaults(projects));
+      renderCards(projects);
     }
     function showMsg(msg, type){ const el = panel.querySelector('#projAdminMsg'); if(!el) return; el.textContent = msg; el.className = 'auth-msg ' + (type||''); }
   }
@@ -239,8 +205,7 @@
 
   document.addEventListener('DOMContentLoaded', async function(){
     const projects = await fetchProjects();
-    const merged = mergeWithDefaults(projects);
-    if(merged && merged.length){ renderCards(merged); }
+    if(projects && projects.length){ renderCards(projects); }
     buildAdminPanel(projects);
   });
 })();
