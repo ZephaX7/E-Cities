@@ -164,20 +164,23 @@
           if(files && files.length){ loadIFCFile(files[0]); }
         }
 
+        let handlersAttached = false;
         function attachAdminHandlers(){
-          fileInput.addEventListener('change', (e)=>{ handleFiles(e.target.files); e.target.value=''; });
+          if(handlersAttached) return;
+          handlersAttached = true;
+          fileInput?.addEventListener('change', (e)=>{ handleFiles(e.target.files); e.target.value=''; });
           container.addEventListener('dragover', (e)=>{ e.preventDefault(); overlay && overlay.classList.add('drop'); });
           container.addEventListener('dragleave', (e)=>{ e.preventDefault(); overlay && overlay.classList.remove('drop'); });
           container.addEventListener('drop', (e)=>{ e.preventDefault(); overlay && overlay.classList.remove('drop'); overlay && overlay.classList.add('hidden'); handleFiles(e.dataTransfer.files); });
-          if(overlay) overlay.textContent = 'Glissez-déposez votre fichier IFC ici';
+          if(overlay){ overlay.textContent = 'Glissez-déposez votre fichier IFC ici'; overlay.classList.remove('hidden'); overlay.style.pointerEvents = 'none'; }
           if(fileInput) fileInput.disabled = false;
           if(fileLabel) fileLabel.classList.remove('disabled');
-          showMsg('Mode admin: chargez un fichier IFC.', 'info');
+          showMsg('Mode admin : chargez un fichier IFC.', 'info');
         }
 
-        function disableHandlers(){
-          if(overlay){ overlay.textContent = 'Chargement IFC réservé aux administrateurs.'; overlay.classList.remove('hidden'); overlay.style.pointerEvents = 'auto'; }
-          showMsg('Vous devez être administrateur pour charger un IFC.', 'info');
+        function disableHandlers(reason){
+          if(overlay){ overlay.textContent = reason || 'Chargement IFC réservé aux administrateurs.'; overlay.classList.remove('hidden'); overlay.style.pointerEvents = 'auto'; }
+          showMsg(reason || 'Vous devez être administrateur pour charger un IFC.', 'info');
           if(fileLabel) fileLabel.classList.add('disabled');
           if(fileInput) fileInput.disabled = true;
         }
@@ -193,8 +196,8 @@
             const expires = prof && prof.admin_expires ? new Date(prof.admin_expires) : null;
             const stillAdmin = (prof && prof.role === 'Admin') || (expires && expires > new Date());
             if(stillAdmin){ isAdmin = true; attachAdminHandlers(); }
-            else disableHandlers();
-          }catch(err){ console.error('admin check error', err); disableHandlers(); }
+            else disableHandlers('Connectez-vous puis demandez les droits admin via votre profil.');
+          }catch(err){ console.error('admin check error', err); disableHandlers('Impossible de vérifier le rôle admin. Réessayez ou reconnectez-vous.'); }
         }
 
         checkAdmin();
