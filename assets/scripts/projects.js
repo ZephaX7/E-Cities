@@ -3,6 +3,33 @@
   const metaApi = document.querySelector('meta[name="api-base"]');
   const API_BASE = (metaApi && metaApi.content) ? metaApi.content.replace(/\/$/, '') : 'http://localhost:3000';
 
+  const defaultProjects = [
+    {
+      slug: 'place-centrale',
+      title: 'Revitalisation de la place centrale',
+      end_date: '2026-03-15',
+      image_url: 'https://images.unsplash.com/photo-1508921912186-1d1a45ebb3c1?q=80&w=1200',
+      votes: 0,
+      is_active: true
+    },
+    {
+      slug: 'piste-cyclable',
+      title: "Aménagement d'une piste cyclable",
+      end_date: '2026-08-01',
+      image_url: 'https://images.unsplash.com/photo-1505842465776-3f3f9b4f3df4?q=80&w=1200',
+      votes: 0,
+      is_active: true
+    },
+    {
+      slug: 'jardin-partage',
+      title: 'Jardin partagé et compost',
+      end_date: '2025-09-30',
+      image_url: 'https://images.unsplash.com/photo-1496307042754-b4aa456c4a2d?q=80&w=1200',
+      votes: 0,
+      is_active: true
+    }
+  ];
+
   function getUser(){ try{ return JSON.parse(localStorage.getItem('ecities_user')); }catch(e){ return null; } }
   function isAdmin(){ const u = getUser(); return !!(u && (u.role === 'Admin')); }
   function fmtDateISOToFR(d){ if(!d) return '—'; try{ const dt = new Date(d); const dd = String(dt.getDate()).padStart(2,'0'); const mm = String(dt.getMonth()+1).padStart(2,'0'); const yyyy = dt.getFullYear(); return `${dd}/${mm}/${yyyy}`; }catch(e){ return '—'; } }
@@ -14,6 +41,13 @@
       const data = await res.json();
       return Array.isArray(data.projects) ? data.projects : [];
     }catch(err){ console.error('fetchProjects error', err); return []; }
+  }
+
+  function mergeWithDefaults(serverProjects){
+    const map = new Map();
+    defaultProjects.forEach(p => map.set(p.slug, { ...p }));
+    (serverProjects || []).forEach(p => map.set(p.slug, { ...p }));
+    return Array.from(map.values());
   }
 
   function renderCards(projects){
@@ -83,7 +117,7 @@
       section.insertBefore(panel, section.querySelector('.projects-cards'));
     }
     const list = panel.querySelector('#projList');
-    list.innerHTML = projects.map(p => `
+    list.innerHTML = (projects || []).map(p => `
       <div class="card" data-slug="${escapeHtml(p.slug)}" style="padding:.8rem;margin:.4rem 0;display:grid;grid-template-columns:2fr 3fr 2fr 2fr auto;gap:.6rem;align-items:center">
         <div><strong>${escapeHtml(p.slug)}</strong></div>
         <div>${escapeHtml(p.title||'')}</div>
@@ -136,7 +170,11 @@
 
     panel.querySelector('#projRefresh').addEventListener('click', refresh);
 
-    async function refresh(){ const projects = await fetchProjects(); buildAdminPanel(projects); renderCards(projects); }
+    async function refresh(){
+      const projects = await fetchProjects();
+      buildAdminPanel(projects);
+      renderCards(mergeWithDefaults(projects));
+    }
     function showMsg(msg, type){ const el = panel.querySelector('#projAdminMsg'); if(!el) return; el.textContent = msg; el.className = 'auth-msg ' + (type||''); }
   }
 
@@ -157,7 +195,7 @@
     actions.querySelector('[data-action="save"]').addEventListener('click', async function(){
       const newTitle = titleCell.querySelector('input').value.trim();
       const newEnd = dateCell.querySelector('input').value.trim();
-      await updateProject(slug, { title: newTitle || null, end_date: newEnd || null });
+      await updateProject(slug, { title: newTitle || null, end_date: newEnd ? newEnd : null });
       // trigger refresh by clicking hidden refresh (if exists)
       const r = document.getElementById('projRefresh'); if(r) r.click();
     });
@@ -183,7 +221,9 @@
   async function updateProject(slug, p){
     try{
       const user = getUser();
-      const res = await fetch(API_BASE + '/projects/' + encodeURIComponent(slug), { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username: user && user.username, ...p }) });
+      const payload = { ...p };
+      if(!payload.end_date) payload.end_date = null;
+      const res = await fetch(API_BASE + '/projects/' + encodeURIComponent(slug), { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username: user && user.username, ...payload }) });
       if(!res.ok){ alert('Erreur mise à jour'); return false; }
       return true;
     }catch(err){ console.error('updateProject error', err); return false; }
@@ -199,7 +239,8 @@
 
   document.addEventListener('DOMContentLoaded', async function(){
     const projects = await fetchProjects();
-    if(projects && projects.length){ renderCards(projects); }
+    const merged = mergeWithDefaults(projects);
+    if(merged && merged.length){ renderCards(merged); }
     buildAdminPanel(projects);
   });
 })();

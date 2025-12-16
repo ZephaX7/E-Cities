@@ -311,11 +311,13 @@ app.post('/projects', async (req, res) => {
   try{
     if(!await isAdminUser(username)) return res.status(403).json({ error: 'Forbidden' });
     await ensureProjectsTable();
+    const cleanEnd = end_date && String(end_date).trim() !== '' ? end_date : null;
+    const cleanImg = image_url && String(image_url).trim() !== '' ? image_url : null;
     const insert = await pool.query(
       `INSERT INTO projects (slug, title, description, end_date, image_url, is_active)
        VALUES ($1,$2,$3,$4,$5,COALESCE($6, TRUE))
        RETURNING slug, title, description, end_date, image_url, is_active, created_at, updated_at`,
-      [slug, title, description || null, end_date || null, image_url || null, typeof is_active === 'boolean' ? is_active : true]
+      [slug, title, description || null, cleanEnd, cleanImg, typeof is_active === 'boolean' ? is_active : true]
     );
     return res.json({ project: insert.rows[0], created: true });
   }catch(err){
@@ -333,6 +335,8 @@ app.put('/projects/:slug', async (req, res) => {
   try{
     if(!await isAdminUser(username)) return res.status(403).json({ error: 'Forbidden' });
     await ensureProjectsTable();
+    const cleanEnd = end_date && String(end_date).trim() !== '' ? end_date : null;
+    const cleanImg = image_url && String(image_url).trim() !== '' ? image_url : null;
     const result = await pool.query(
       `UPDATE projects SET
         title = COALESCE($1, title),
@@ -343,7 +347,7 @@ app.put('/projects/:slug', async (req, res) => {
         updated_at = NOW()
        WHERE slug = $6
        RETURNING slug, title, description, end_date, image_url, is_active, created_at, updated_at`,
-      [title || null, description || null, end_date || null, image_url || null, (typeof is_active === 'boolean') ? is_active : null, slug]
+      [title || null, description || null, cleanEnd, cleanImg, (typeof is_active === 'boolean') ? is_active : null, slug]
     );
     if(result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
     return res.json({ project: result.rows[0], updated: true });
