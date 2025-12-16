@@ -1,0 +1,50 @@
+ISO-10303-21;
+HEADER;
+FILE_DESCRIPTION(('ViewDefinition [CoordinationView]'),'2;1');
+FILE_NAME('simple_house.ifc','2025-12-16T12:00:00',('Thomas Beyney'),('ChatGPT'),'','ChatGPT','');
+FILE_SCHEMA(('IFC2X3'));
+ENDSEC;
+
+DATA;
+#1=IFCPERSON($,'Thomas','Beyney',$,$,$,$,$);
+#2=IFCORGANIZATION($,'ChatGPT',$,$,$);
+#3=IFCPERSONANDORGANIZATION(#1,#2,$);
+#4=IFCAPPLICATION(#2,'1.0','IFC Generator','IFCGEN');
+#5=IFCOWNERHISTORY(#3,#4,$,.ADDED.,$,$,$,0);
+
+#10=IFCPROJECT('0h$Proj1',#5,'Simple House',$,$,$,$,(#20),#30);
+#20=IFCUNITASSIGNMENT((#21));
+#21=IFCSIUNIT(*,.LENGTHUNIT.,$,.METRE.);
+#30=IFCGEOMETRICREPRESENTATIONCONTEXT($,'Model',3,1.E-5,#31,$);
+#31=IFCAXIS2PLACEMENT3D(#32,$,$);
+#32=IFCCARTESIANPOINT((0.,0.,0.));
+
+#40=IFCSITE('0h$Site1',#5,'Site',$,$,#41,$,$,.ELEMENT.,$,$,$,$,$);
+#41=IFCLOCALPLACEMENT($,#42);
+#42=IFCAXIS2PLACEMENT3D(#32,$,$);
+
+#50=IFCBUILDING('0h$Bldg1',#5,'House',$,$,#51,$,$,.ELEMENT.,$,$,$);
+#51=IFCLOCALPLACEMENT(#41,#42);
+
+#60=IFCBUILDINGSTOREY('0h$Str1',#5,'Ground Floor',$,$,#61,$,$,.ELEMENT.,0.0);
+#61=IFCLOCALPLACEMENT(#51,#42);
+
+#100=IFCSPACE('0h$Room1',#5,'Living Room',$,$,#101,$,$,.ELEMENT.,$);
+#101=IFCLOCALPLACEMENT(#61,#42);
+
+#110=IFCSPACE('0h$Room2',#5,'Kitchen',$,$,#111,$,$,.ELEMENT.,$);
+#111=IFCLOCALPLACEMENT(#61,#42);
+
+#120=IFCSPACE('0h$Room3',#5,'Bedroom',$,$,#121,$,$,.ELEMENT.,$);
+#121=IFCLOCALPLACEMENT(#61,#42);
+
+#130=IFCSPACE('0h$Room4',#5,'Bathroom',$,$,#131,$,$,.ELEMENT.,$);
+#131=IFCLOCALPLACEMENT(#61,#42);
+
+#200=IFCRELAGGREGATES('0h$Rel1',#5,$,$,#10,(#40));
+#201=IFCRELAGGREGATES('0h$Rel2',#5,$,$,#40,(#50));
+#202=IFCRELAGGREGATES('0h$Rel3',#5,$,$,#50,(#60));
+#203=IFCRELAGGREGATES('0h$Rel4',#5,$,$,#60,(#100,#110,#120,#130));
+
+ENDSEC;
+END-ISO-10303-21;
