@@ -68,15 +68,17 @@
       import { IFCLoader } from 'https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/loaders/IFCLoader.js';
 
       document.addEventListener('DOMContentLoaded', () => {
+        const API_BASE = (document.querySelector('meta[name="api-base"]')?.content || 'http://localhost:3000').replace(/\/$/, '');
         function getUser(){ try{ return JSON.parse(localStorage.getItem('ecities_user')); }catch(e){ return null; } }
         const user = getUser();
-        const isAdmin = !!(user && user.role === 'Admin');
+        let isAdmin = !!(user && user.role === 'Admin');
 
         const container = document.getElementById('viewer');
         const overlay = document.getElementById('viewerOverlay');
         const fileInput = document.getElementById('ifcInput');
         const resetBtn = document.getElementById('resetView');
         const msgEl = document.getElementById('vizMsg');
+        const fileLabel = document.querySelector('label[for="ifcInput"]');
 
         function showMsg(text, type='info'){ if(!msgEl) return; msgEl.textContent = text || ''; msgEl.className = 'auth-msg ' + type; }
         function showError(text){ showMsg(text || 'Erreur de chargement.', 'error'); console.error(text); }
@@ -154,26 +156,48 @@
               scene.add(model);
               fitCameraToObject(model);
               showMsg('Modèle chargé : ' + file.name, 'info');
-            }, (err)=>{ console.error('IFC parse error', err); showError('Echec du chargement IFC.'); });
-          }catch(err){ console.error(err); showError('Echec du chargement IFC.'); }
+            }, (err)=>{ console.error('IFC parse error', err); showError('Echec du chargement IFC. Vérifiez le fichier.'); });
+          }catch(err){ console.error(err); showError('Echec du chargement IFC. Vérifiez le fichier ou réessayez.'); }
         }
 
         function handleFiles(files){
           if(files && files.length){ loadIFCFile(files[0]); }
         }
 
-        if(isAdmin){
+        function attachAdminHandlers(){
           fileInput.addEventListener('change', (e)=>{ handleFiles(e.target.files); e.target.value=''; });
           container.addEventListener('dragover', (e)=>{ e.preventDefault(); overlay && overlay.classList.add('drop'); });
           container.addEventListener('dragleave', (e)=>{ e.preventDefault(); overlay && overlay.classList.remove('drop'); });
           container.addEventListener('drop', (e)=>{ e.preventDefault(); overlay && overlay.classList.remove('drop'); overlay && overlay.classList.add('hidden'); handleFiles(e.dataTransfer.files); });
-        } else {
+          if(overlay) overlay.textContent = 'Glissez-déposez votre fichier IFC ici';
+          if(fileInput) fileInput.disabled = false;
+          if(fileLabel) fileLabel.classList.remove('disabled');
+          showMsg('Mode admin: chargez un fichier IFC.', 'info');
+        }
+
+        function disableHandlers(){
           if(overlay){ overlay.textContent = 'Chargement IFC réservé aux administrateurs.'; overlay.classList.remove('hidden'); overlay.style.pointerEvents = 'auto'; }
-          if(msgEl) showMsg('Vous devez être administrateur pour charger un IFC.', 'info');
-          const label = document.querySelector('label[for="ifcInput"]');
-          if(label) label.classList.add('disabled');
+          showMsg('Vous devez être administrateur pour charger un IFC.', 'info');
+          if(fileLabel) fileLabel.classList.add('disabled');
           if(fileInput) fileInput.disabled = true;
         }
+
+        async function checkAdmin(){
+          if(isAdmin) { attachAdminHandlers(); return; }
+          if(!user || !user.username){ disableHandlers(); return; }
+          try{
+            const res = await fetch(`${API_BASE}/profile?username=${encodeURIComponent(user.username)}`);
+            if(!res.ok) { disableHandlers(); return; }
+            const data = await res.json();
+            const prof = data && data.profile;
+            const expires = prof && prof.admin_expires ? new Date(prof.admin_expires) : null;
+            const stillAdmin = (prof && prof.role === 'Admin') || (expires && expires > new Date());
+            if(stillAdmin){ isAdmin = true; attachAdminHandlers(); }
+            else disableHandlers();
+          }catch(err){ console.error('admin check error', err); disableHandlers(); }
+        }
+
+        checkAdmin();
 
         resetBtn.addEventListener('click', ()=>{ controls.reset(); camera.position.set(8,6,12); controls.target.set(0,1,0); controls.update(); });
 
