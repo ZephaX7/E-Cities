@@ -68,6 +68,10 @@
       import { IFCLoader } from 'https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/loaders/IFCLoader.js';
 
       document.addEventListener('DOMContentLoaded', () => {
+        function getUser(){ try{ return JSON.parse(localStorage.getItem('ecities_user')); }catch(e){ return null; } }
+        const user = getUser();
+        const isAdmin = !!(user && user.role === 'Admin');
+
         const container = document.getElementById('viewer');
         const overlay = document.getElementById('viewerOverlay');
         const fileInput = document.getElementById('ifcInput');
@@ -148,11 +152,18 @@
           if(files && files.length){ loadIFCFile(files[0]); }
         }
 
-        fileInput.addEventListener('change', (e)=>{ handleFiles(e.target.files); e.target.value=''; });
-
-        container.addEventListener('dragover', (e)=>{ e.preventDefault(); overlay && overlay.classList.add('drop'); });
-        container.addEventListener('dragleave', (e)=>{ e.preventDefault(); overlay && overlay.classList.remove('drop'); });
-        container.addEventListener('drop', (e)=>{ e.preventDefault(); overlay && overlay.classList.remove('drop'); overlay && overlay.classList.add('hidden'); handleFiles(e.dataTransfer.files); });
+        if(isAdmin){
+          fileInput.addEventListener('change', (e)=>{ handleFiles(e.target.files); e.target.value=''; });
+          container.addEventListener('dragover', (e)=>{ e.preventDefault(); overlay && overlay.classList.add('drop'); });
+          container.addEventListener('dragleave', (e)=>{ e.preventDefault(); overlay && overlay.classList.remove('drop'); });
+          container.addEventListener('drop', (e)=>{ e.preventDefault(); overlay && overlay.classList.remove('drop'); overlay && overlay.classList.add('hidden'); handleFiles(e.dataTransfer.files); });
+        } else {
+          if(overlay){ overlay.textContent = 'Chargement IFC réservé aux administrateurs.'; overlay.classList.remove('hidden'); overlay.style.pointerEvents = 'auto'; }
+          if(msgEl) showMsg('Vous devez être administrateur pour charger un IFC.', 'info');
+          const label = document.querySelector('label[for="ifcInput"]');
+          if(label) label.classList.add('disabled');
+          if(fileInput) fileInput.disabled = true;
+        }
 
         resetBtn.addEventListener('click', ()=>{ controls.reset(); camera.position.set(8,6,12); controls.target.set(0,1,0); controls.update(); });
 
