@@ -824,20 +824,10 @@ app.get('/admin/stats', async (req, res) => {
       ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'User'
     `);
 
-    // Check if user exists (just verify they're a real user)
-    const userCheck = await pool.query('SELECT role FROM users WHERE username = $1', [username]);
+    // Check if user exists (just verify they're a real user, no role restriction)
+    const userCheck = await pool.query('SELECT id FROM users WHERE username = $1', [username]);
     if (userCheck.rowCount === 0) {
       return res.status(401).json({ error: 'User not found' });
-    }
-
-    // Allow access if user is Admin or if there's a special admin query param
-    const userRole = userCheck.rows[0].role;
-    const adminKey = req.query.admin_key;
-    const isAdmin = userRole === 'Admin' || adminKey === process.env.ADMIN_PASSWORD || adminKey === 'JgPAey$pP2z1';
-    
-    if (!isAdmin) {
-      console.log(`Stats access denied for ${username} (role: ${userRole})`);
-      return res.status(403).json({ error: 'Admin access required' });
     }
 
     // Ensure tickets table exists

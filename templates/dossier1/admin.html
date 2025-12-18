@@ -94,7 +94,7 @@
 
         async function loadStats() {
           try {
-            const res = await fetch(API_BASE + '/admin/stats?username=' + encodeURIComponent(user.username) + '&admin_key=JgPAey$pP2z1');
+            const res = await fetch(API_BASE + '/admin/stats?username=' + encodeURIComponent(user.username));
             if (!res.ok) {
               const errData = await res.json().catch(()=>({}));
               statsGrid.innerHTML = '<div style="color:#ffb3b3;grid-column:1/-1">Erreur: ' + (errData.error || res.status) + '</div>';
