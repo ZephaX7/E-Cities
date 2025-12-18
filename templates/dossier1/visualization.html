@@ -158,24 +158,25 @@
             const res = await fetch(url);
             if(!res.ok){ showMsg('Fichier IFC introuvable', 'error'); return; }
             const text = await res.text();
-            
+
             // Parse simple IFC: extract murs (IFCWALLSTANDARDCASE)
             const wallMatches = text.matchAll(/#(\d+)=IFCWALLSTANDARDCASE\(/g);
             let wallCount = 0;
-            
+            const group = new THREE.Group();
+
             for(const match of wallMatches){
               wallCount++;
               // Créer un mur simple (boîte)
               const geometry = new THREE.BoxGeometry(10, 3, 0.3);
               const material = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.1, roughness: 0.8 });
               const wall = new THREE.Mesh(geometry, material);
-              
+
               // Position aléatoire pour démo
               wall.position.x = (wallCount % 2) * 5;
               wall.position.z = Math.floor(wallCount / 2) * 5;
-              scene.add(wall);
+              group.add(wall);
             }
-            
+
             if(wallCount === 0){
               // Si pas de murs trouvés, créer structure minimale
               const geo = new THREE.BoxGeometry(6, 3, 4);
@@ -184,18 +185,14 @@
               scene.add(house);
               fitCameraToObject(house);
             } else {
-              // Centrer caméra sur tous les murs
-              const group = new THREE.Group();
-              scene.children.filter(c => c.isMesh && c !== ground).forEach(m => {
-                group.add(m);
-              });
-              if(group.children.length > 0) fitCameraToObject(group);
+              scene.add(group);
+              fitCameraToObject(group);
             }
-            
+
             showMsg('Modèle IFC chargé (' + wallCount + ' murs)', 'info');
-          }catch(err){ 
-            showMsg('Erreur chargement: ' + err.message, 'error'); 
-            console.error(err); 
+          }catch(err){
+            showMsg('Erreur chargement: ' + err.message, 'error');
+            console.error(err);
           }
         }
 
