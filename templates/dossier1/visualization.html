@@ -174,39 +174,115 @@
           if(!res.ok){ showMsg('Fichier IFC introuvable', 'error'); return; }
           const text = await res.text();
 
-          // Parse simple : extraire les murs et créer des boîtes 3D
+          // Parse IFC et extraire les données géométriques réelles
           const group = new THREE.Group();
-          const wallMatches = [...text.matchAll(/#(\d+)=IFCWALLSTANDARDCASE\([^)]+\)/g)];
           
-          if(wallMatches.length > 0){
-            wallMatches.forEach((match, i) => {
-              const geo = new THREE.BoxGeometry(10, 3, 0.3);
-              const mat = new THREE.MeshStandardMaterial({ 
-                color: 0x888888, 
-                metalness: 0.1, 
-                roughness: 0.8 
-              });
-              const wall = new THREE.Mesh(geo, mat);
-              
-              // Position simplifiée: layout en grille
-              wall.position.x = (i % 3) * 6 - 6;
-              wall.position.z = Math.floor(i / 3) * 5;
-              wall.position.y = 1.5;
-              group.add(wall);
+          // Parser les murs avec leurs positions et dimensions
+          const wallData = [];
+          const wallMatches = [...text.matchAll(/#(\d+)=IFCWALLSTANDARDCASE\('([^']+)',#\d+,'([^']+)'/g)];
+          
+          for(const match of wallMatches){
+            const wallId = match[1];
+            const wallName = match[3];
+            
+            // Trouver les coordonnées du mur (IFCCARTESIANPOINT)
+            const placementMatch = text.match(new RegExp(`#${wallId}=IFCWALLSTANDARDCASE[^#]+#(\\d+)`));
+            if(placementMatch){
+              const placementId = placementMatch[1];
+              const coordMatch = text.match(new RegExp(`#${placementId}=IFCLOCALPLACEMENT[^#]+IFCAXIS2PLACEMENT3D\\(#(\\d+)`));
+              if(coordMatch){
+                const pointId = coordMatch[1];
+                const pointMatch = text.match(new RegExp(`#${pointId}=IFCCARTESIANPOINT\\(\\(([^)]+)\\)\\)`));
+                if(pointMatch){
+                  const coords = pointMatch[1].split(',').map(c => parseFloat(c));
+                  
+                  // Trouver les dimensions (IFCRECTANGLEPROFILEDEF)
+                  const profileMatch = text.match(new RegExp(`#${wallId}[^#]*IFCRECTANGLEPROFILEDEF[^,]+,[^,]+,[^,]+,([0-9.]+),([0-9.]+)`));
+                  if(profileMatch){
+                    const width = parseFloat(profileMatch[1]);
+                    const thickness = parseFloat(profileMatch[2]);
+                    
+                    // Trouver la hauteur (IFCEXTRUDEDAREASOLID)
+                    const heightMatch = text.match(new RegExp(`#${wallId}[^#]*IFCEXTRUDEDAREASOLID[^,]+,[^,]+,[^,]+,([0-9.]+)`));
+                    const height = heightMatch ? parseFloat(heightMatch[1]) : 3;
+                    
+                    wallData.push({ name: wallName, x: coords[0], y: coords[1], z: coords[2], width, thickness, height });
+                  }
+                }
+              }
+            }
+          }
+          
+          // Créer les murs 3D avec vraies dimensions
+          if(wallData.length > 0){
+            const wallMaterial = new THREE.MeshStandardMaterial({ 
+              color: 0xd4c5a9, 
+              metalness: 0.0, 
+              roughness: 0.9 
             });
+            
+            wallData.forEach(wall => {
+              // Détecter orientation (horizontal ou vertical)
+              const isVertical = wall.name.includes('Left') || wall.name.includes('Right') || wall.name.includes('Middle');
+              
+              let geo;
+              if(isVertical){
+                geo = new THREE.BoxGeometry(wall.thickness, wall.height, wall.width);
+              } else {
+                geo = new THREE.BoxGeometry(wall.width, wall.height, wall.thickness);
+              }
+              
+              const mesh = new THREE.Mesh(geo, wallMaterial);
+              
+              // Position
+              mesh.position.x = wall.x + (isVertical ? 0 : wall.width/2);
+              mesh.position.y = wall.height / 2;
+              mesh.position.z = wall.y + (isVertical ? wall.width/2 : 0);
+              
+              group.add(mesh);
+            });
+            
+            // Ajouter un toit simple
+            const roofGeo = new THREE.ConeGeometry(7, 2, 4);
+            const roofMat = new THREE.MeshStandardMaterial({ color: 0x8b4513, roughness: 0.8 });
+            const roof = new THREE.Mesh(roofGeo, roofMat);
+            roof.position.set(5, 4, 3.5);
+            roof.rotation.y = Math.PI / 4;
+            group.add(roof);
             
             scene.add(group);
             fitCameraToObject(group);
-            showMsg(`Modèle IFC chargé (${wallMatches.length} murs)`, 'info');
+            showMsg(`Maison chargée (${wallData.length} murs + toit)`, 'info');
           } else {
-            // Si pas de murs, afficher un cube simple
-            const geo = new THREE.BoxGeometry(6, 3, 4);
-            const mat = new THREE.MeshStandardMaterial({ color: 0xbb8844 });
-            const house = new THREE.Mesh(geo, mat);
-            house.position.y = 1.5;
-            scene.add(house);
-            fitCameraToObject(house);
-            showMsg('Modèle IFC chargé (structure basique)', 'info');
+            // Fallback: maison simple si parsing échoue
+            const houseMat = new THREE.MeshStandardMaterial({ color: 0xd4c5a9 });
+            
+            // Murs périmètre
+            const walls = [
+              { w:10, h:3, d:0.3, x:5, y:1.5, z:0 },      // Front
+              { w:0.3, h:3, d:7, x:10, y:1.5, z:3.5 },    // Right
+              { w:10, h:3, d:0.3, x:5, y:1.5, z:7 },      // Back
+              { w:0.3, h:3, d:7, x:0, y:1.5, z:3.5 }      // Left
+            ];
+            
+            walls.forEach(w => {
+              const geo = new THREE.BoxGeometry(w.w, w.h, w.d);
+              const mesh = new THREE.Mesh(geo, houseMat);
+              mesh.position.set(w.x, w.y, w.z);
+              group.add(mesh);
+            });
+            
+            // Toit
+            const roofGeo = new THREE.ConeGeometry(7, 2, 4);
+            const roofMat = new THREE.MeshStandardMaterial({ color: 0x8b4513 });
+            const roof = new THREE.Mesh(roofGeo, roofMat);
+            roof.position.set(5, 4, 3.5);
+            roof.rotation.y = Math.PI / 4;
+            group.add(roof);
+            
+            scene.add(group);
+            fitCameraToObject(group);
+            showMsg('Maison basique chargée', 'info');
           }
         }catch(err){
           showMsg('Erreur chargement: ' + err.message, 'error');
