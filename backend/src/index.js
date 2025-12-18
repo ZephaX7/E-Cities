@@ -819,11 +819,28 @@ app.get('/admin/stats', async (req, res) => {
   if (!username) return res.status(400).json({ error: 'Missing username' });
   
   try {
+    // Ensure users table has role column
+    await pool.query(`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'User'
+    `);
+
     // Check if user is admin
     const adminCheck = await pool.query('SELECT role FROM users WHERE username = $1', [username]);
     if (adminCheck.rowCount === 0 || adminCheck.rows[0].role !== 'Admin') {
       return res.status(403).json({ error: 'Unauthorized' });
     }
+
+    // Ensure tickets table exists
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS tickets (
+        id SERIAL PRIMARY KEY,
+        title TEXT NOT NULL,
+        content TEXT NOT NULL,
+        sender_username TEXT NOT NULL,
+        status TEXT DEFAULT 'open',
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
 
     // Get total users count
     const totalUsers = await pool.query('SELECT COUNT(*) as count FROM users');
@@ -867,7 +884,7 @@ app.get('/admin/stats', async (req, res) => {
     });
   } catch (err) {
     console.error('admin stats error', err);
-    return res.status(500).json({ error: 'Database error' });
+    return res.status(500).json({ error: 'Database error: ' + err.message });
   }
 });
 
