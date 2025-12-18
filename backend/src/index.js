@@ -813,6 +813,64 @@ app.post('/ai/chat', async (req, res) => {
   return res.json({ reply: aiReply, usedAI, ticketCreated, ticketId });
 });
 
+// === ADMIN STATS ENDPOINTS ===
+app.get('/admin/stats', async (req, res) => {
+  const username = req.query.username;
+  if (!username) return res.status(400).json({ error: 'Missing username' });
+  
+  try {
+    // Check if user is admin
+    const adminCheck = await pool.query('SELECT role FROM users WHERE username = $1', [username]);
+    if (adminCheck.rowCount === 0 || adminCheck.rows[0].role !== 'Admin') {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    // Get total users count
+    const totalUsers = await pool.query('SELECT COUNT(*) as count FROM users');
+    
+    // Get users created this month
+    const thisMonth = await pool.query(`
+      SELECT COUNT(*) as count FROM users 
+      WHERE created_at >= DATE_TRUNC('month', NOW())
+    `);
+    
+    // Get users created this week
+    const thisWeek = await pool.query(`
+      SELECT COUNT(*) as count FROM users 
+      WHERE created_at >= DATE_TRUNC('week', NOW())
+    `);
+    
+    // Get open tickets count
+    const openTickets = await pool.query(`
+      SELECT COUNT(*) as count FROM tickets 
+      WHERE status = 'open'
+    `);
+    
+    // Get total tickets count
+    const allTickets = await pool.query('SELECT COUNT(*) as count FROM tickets');
+    
+    // Get tickets created this week
+    const ticketsThisWeek = await pool.query(`
+      SELECT COUNT(*) as count FROM tickets 
+      WHERE created_at >= DATE_TRUNC('week', NOW())
+    `);
+    
+    return res.json({
+      stats: {
+        totalUsers: parseInt(totalUsers.rows[0].count),
+        usersThisMonth: parseInt(thisMonth.rows[0].count),
+        usersThisWeek: parseInt(thisWeek.rows[0].count),
+        openTickets: parseInt(openTickets.rows[0].count),
+        totalTickets: parseInt(allTickets.rows[0].count),
+        ticketsThisWeek: parseInt(ticketsThisWeek.rows[0].count)
+      }
+    });
+  } catch (err) {
+    console.error('admin stats error', err);
+    return res.status(500).json({ error: 'Database error' });
+  }
+});
+
 process.on('uncaughtException', (err) => {
   console.error('Uncaught exception', err);
   // keep process running for Render to capture logs; optionally exit
