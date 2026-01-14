@@ -973,10 +973,11 @@ app.post('/contact', async (req, res) => {
     });
 
     await transporter.sendMail({
-      from: `${name} <${email}>`,
+      from: `E-Cities <${SMTP_USER}>`,
+      replyTo: `${name} <${email}>`,
       to: TO_EMAIL,
       subject: `Contact E-cities - ${name}`,
-      text: `De : ${name} <${email}>\n\nMessage :\n${message}`
+      text: `Nouveau message de contact E-Cities\n\nNom : ${name}\nEmail : ${email}\n\nMessage :\n${message}`
     });
 
     return res.json({ sent:true });
