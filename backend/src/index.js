@@ -965,15 +965,25 @@ app.post('/contact', async (req, res) => {
       return res.json({ sent:false, simulated:true });
     }
 
+    console.log('[CONTACT] Attempting SMTP connection:', { host: SMTP_HOST, port: SMTP_PORT, user: SMTP_USER });
+
     const transporter = nodemailer.createTransport({
       host: SMTP_HOST,
       port: SMTP_PORT,
       secure: SMTP_PORT === 465,
       auth: { user: SMTP_USER, pass: SMTP_PASS },
       connectionTimeout: 10000,
-      greetingTimeout: 10000
+      greetingTimeout: 10000,
+      logger: true,
+      debug: true
     });
 
+    // Verify connection first
+    console.log('[CONTACT] Verifying SMTP connection...');
+    await transporter.verify();
+    console.log('[CONTACT] SMTP connection verified successfully');
+
+    console.log('[CONTACT] Sending email...');
     await transporter.sendMail({
       from: `E-Cities <${SMTP_USER}>`,
       replyTo: `${name} <${email}>`,
@@ -982,10 +992,16 @@ app.post('/contact', async (req, res) => {
       text: `Nouveau message de contact E-Cities\n\nNom : ${name}\nEmail : ${email}\n\nMessage :\n${message}`
     });
 
+    console.log('[CONTACT] Email sent successfully');
     return res.json({ sent:true });
   }catch(err){
-    console.error('contact send error', err);
-    console.error('SMTP details:', { host: process.env.SMTP_HOST, port: process.env.SMTP_PORT, user: process.env.SMTP_USER });
+    console.error('[CONTACT] Error details:', {
+      message: err.message,
+      code: err.code,
+      command: err.command,
+      response: err.response,
+      responseCode: err.responseCode
+    });
     return res.status(500).json({ error: 'Email sending failed: ' + (err.message || 'Unknown error') });
   }
 });
