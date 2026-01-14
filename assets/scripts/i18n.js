@@ -153,7 +153,8 @@ const I18N = (function(){
 
     // form submit message
     const form = document.getElementById('contactForm');
-    if(form){
+    // Attach simulated alert only if no real contact handler is enabled
+    if(form && !window.EcitiesContactEnabled){
       form.addEventListener('submit', function(e){ e.preventDefault(); alert((lang === 'fr') ? 'Merci — message simulé (formulaire non relié).' : 'Thanks — message simulated (form not connected).'); });
     }
 

@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import pkg from 'pg';
 import bcrypt from 'bcryptjs';
+import nodemailer from 'nodemailer';
 
 const { Pool } = pkg;
 
@@ -774,6 +775,59 @@ app.get('/problems', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Backend listening on port ${PORT}`));
+
+// Contact form: send email to configured recipient
+app.post('/contact', async (req, res) => {
+  const { name, email, message } = req.body || {};
+  function isValidEmail(e){
+    if(!e) return false;
+    const basic = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+    if(!basic.test(e)) return false;
+    if(/test/i.test(e)) return false;
+    return true;
+  }
+  function hasInsults(text){
+    if(!text) return false;
+    const lower = String(text).toLowerCase();
+    const bad = ['connard','connasse','fdp','fils de pute','pute','salope','batard','encule','enfoire','merde','bouffon','naze','abruti','cretin','idiot','con ',' con'];
+    return bad.some(w => lower.includes(w));
+  }
+  if(!name || !email || !message) return res.status(400).json({ error: 'Missing fields' });
+  if(!isValidEmail(email)) return res.status(400).json({ error: 'Invalid email' });
+  if(hasInsults(name) || hasInsults(message)) return res.status(400).json({ error: 'Insulting content blocked' });
+
+  try{
+    const SMTP_HOST = process.env.SMTP_HOST || 'smtp.gmail.com';
+    const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587', 10);
+    const SMTP_USER = process.env.SMTP_USER;
+    const SMTP_PASS = process.env.SMTP_PASS;
+    const TO_EMAIL = process.env.CONTACT_TO || 'ecities5@gmail.com';
+
+    if(!SMTP_USER || !SMTP_PASS){
+      console.warn('SMTP not configured; simulating send');
+      return res.json({ sent:false, simulated:true });
+    }
+
+    const transporter = nodemailer.createTransport({
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      secure: SMTP_PORT === 465,
+      auth: { user: SMTP_USER, pass: SMTP_PASS }
+    });
+
+    await transporter.sendMail({
+      from: `${name} <${email}>`,
+      to: TO_EMAIL,
+      subject: `Contact E-cities - ${name}`,
+      text: `De : ${name} <${email}>\n\nMessage :\n${message}`
+    });
+
+    return res.json({ sent:true });
+  }catch(err){
+    console.error('contact send error', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
 
 // AI chatbot conversation endpoint
 // POST /ai/chat { username?, message, history? }

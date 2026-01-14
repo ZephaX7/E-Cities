@@ -10,6 +10,7 @@
     <link rel="shortcut icon" href="../../assets/images/favicon.svg">
     <title>E-cities</title>
     <link rel="stylesheet" href="../../assets/styles/styles.css">
+    <script>window.EcitiesContactEnabled = true;</script>
   </head>
   <body>
     <header class="top">
@@ -141,11 +142,22 @@
           if(!isValidEmail(email)){ showBanner('Veuillez saisir un email valide', 'error'); return; }
           if(hasInsults(name) || hasInsults(message)){ showBanner('Le mail ne peut pas être envoyé car il contient des propos insultants.', 'error'); return; }
 
-          const subject = encodeURIComponent('Contact E-cities - ' + name);
-          const body = encodeURIComponent('De : ' + name + '\nEmail : ' + email + '\n\nMessage :\n' + message);
-          const mailto = `mailto:ecities5@gmail.com?subject=${subject}&body=${body}`;
-          window.location.href = mailto;
-          showBanner('Ouverture de votre client mail…', 'info');
+          // Submit to backend without leaving the page
+          const metaApi = document.querySelector('meta[name="api-base"]');
+          const API_BASE = (metaApi && metaApi.content) ? metaApi.content.replace(/\/$/, '') : 'http://localhost:3000';
+          fetch(API_BASE + '/contact', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, email, message })
+          }).then(async (res) => {
+            if(!res.ok){ const data = await res.json().catch(()=>({})); showBanner(data.error || 'Erreur lors de l\'envoi du message', 'error'); return; }
+            const data = await res.json().catch(()=>({}));
+            if(data.sent){ showBanner('Message envoyé. Merci pour votre contact !', 'success'); form.reset(); }
+            else { showBanner('Serveur non configuré pour envoyer des emails (simulation).', 'info'); form.reset(); }
+          }).catch((err)=>{
+            console.error('contact send error', err);
+            showBanner('Erreur réseau: impossible d\'envoyer le message', 'error');
+          });
         });
       })();
     </script>
