@@ -76,6 +76,27 @@ CREATE TABLE IF NOT EXISTS problems (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
+-- Surveys table
+CREATE TABLE IF NOT EXISTS surveys (
+  id SERIAL PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  question TEXT NOT NULL,
+  options TEXT NOT NULL,
+  status TEXT DEFAULT 'open',
+  created_at TIMESTAMP DEFAULT NOW(),
+  ended_at TIMESTAMP NULL
+);
+
+-- Survey responses table
+CREATE TABLE IF NOT EXISTS survey_responses (
+  id SERIAL PRIMARY KEY,
+  survey_id INTEGER REFERENCES surveys(id) ON DELETE CASCADE,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  response TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE (survey_id, user_id)
+);
+
 -- Create indexes for better query performance
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 CREATE INDEX IF NOT EXISTS idx_projects_slug ON projects(slug);
@@ -84,3 +105,7 @@ CREATE INDEX IF NOT EXISTS idx_votes_project_id ON votes(project_id);
 CREATE INDEX IF NOT EXISTS idx_tickets_sender_username ON tickets(sender_username);
 CREATE INDEX IF NOT EXISTS idx_ticket_replies_ticket_id ON ticket_replies(ticket_id);
 CREATE INDEX IF NOT EXISTS idx_ticket_replies_sender_username ON ticket_replies(sender_username);
+CREATE INDEX IF NOT EXISTS idx_surveys_project_id ON surveys(project_id);
+CREATE INDEX IF NOT EXISTS idx_surveys_status ON surveys(status);
+CREATE INDEX IF NOT EXISTS idx_survey_responses_survey_id ON survey_responses(survey_id);
+CREATE INDEX IF NOT EXISTS idx_survey_responses_user_id ON survey_responses(user_id);

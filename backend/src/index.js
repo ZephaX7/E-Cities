@@ -703,6 +703,42 @@ async function ensureProblemsTable(){
   }catch(err){ console.error('ensureProblemsTable error', err); }
 }
 
+// Ensure surveys table exists helper
+async function ensureSurveysTable(){
+  try{
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS surveys (
+        id SERIAL PRIMARY KEY,
+        project_id TEXT NOT NULL,
+        question TEXT NOT NULL,
+        options TEXT NOT NULL,
+        status TEXT DEFAULT 'open',
+        created_at TIMESTAMP DEFAULT NOW(),
+        ended_at TIMESTAMP NULL
+      )
+    `);
+    await pool.query("ALTER TABLE surveys ADD COLUMN IF NOT EXISTS ended_at TIMESTAMP NULL");
+  }catch(err){ console.error('ensureSurveysTable error', err); }
+}
+
+// Ensure survey responses table exists helper
+async function ensureSurveyResponsesTable(){
+  try{
+    await ensureSurveysTable();
+    await ensureUsersTable();
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS survey_responses (
+        id SERIAL PRIMARY KEY,
+        survey_id INTEGER REFERENCES surveys(id) ON DELETE CASCADE,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        response TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE (survey_id, user_id)
+      )
+    `);
+  }catch(err){ console.error('ensureSurveyResponsesTable error', err); }
+}
+
 // Submit an idea
 app.post('/ideas', async (req, res) => {
   const { address, content, username } = req.body || {};
@@ -799,6 +835,92 @@ app.post('/problems/:id/delete', async (req, res) => {
     const r = await pool.query('DELETE FROM problems WHERE id = $1', [id]);
     return res.json({ deleted: r.rowCount > 0 });
   }catch(err){ console.error('delete problem error', err); return res.status(500).json({ error: 'Server error' }); }
+});
+
+// Create a survey for a project (admin only)
+app.post('/projects/:projectId/survey', async (req, res) => {
+  const projectId = req.params.projectId;
+  const { question, options, username } = req.body || {};
+  if(!projectId || !question || !options || !username) return res.status(400).json({ error: 'Missing fields' });
+  const isAdmin = await isAdminUser(username);
+  if(!isAdmin) return res.status(403).json({ error: 'Not authorized' });
+  try{
+    await ensureSurveysTable();
+    const optionsStr = JSON.stringify(Array.isArray(options) ? options : []);
+    const result = await pool.query('INSERT INTO surveys (project_id, question, options, status) VALUES ($1, $2, $3, $4) RETURNING id, project_id, question, options, status, created_at, ended_at', [projectId, question, optionsStr, 'open']);
+    return res.json(result.rows[0]);
+  }catch(err){ console.error('create survey error', err); return res.status(500).json({ error: 'Server error' }); }
+});
+
+// Get survey for a project (all users)
+app.get('/projects/:projectId/survey', async (req, res) => {
+  const projectId = req.params.projectId;
+  if(!projectId) return res.status(400).json({ error: 'Missing projectId' });
+  try{
+    await ensureSurveysTable();
+    const result = await pool.query('SELECT id, project_id, question, options, status, created_at, ended_at FROM surveys WHERE project_id = $1 AND status = $2 LIMIT 1', [projectId, 'open']);
+    if(result.rowCount === 0) return res.json(null);
+    const survey = result.rows[0];
+    survey.options = JSON.parse(survey.options || '[]');
+    return res.json(survey);
+  }catch(err){ console.error('get survey error', err); return res.status(500).json({ error: 'Server error' }); }
+});
+
+// Submit a survey response (authenticated user)
+app.post('/survey/:surveyId/response', async (req, res) => {
+  const surveyId = parseInt(req.params.surveyId, 10);
+  const { userId, response } = req.body || {};
+  if(!surveyId || !userId || !response) return res.status(400).json({ error: 'Missing fields' });
+  try{
+    await ensureSurveyResponsesTable();
+    const survey = await pool.query('SELECT status FROM surveys WHERE id = $1', [surveyId]);
+    if(survey.rowCount === 0) return res.status(404).json({ error: 'Survey not found' });
+    if(survey.rows[0].status !== 'open') return res.status(400).json({ error: 'Survey is closed' });
+    const result = await pool.query('INSERT INTO survey_responses (survey_id, user_id, response) VALUES ($1, $2, $3) ON CONFLICT (survey_id, user_id) DO UPDATE SET response = $3 RETURNING id', [surveyId, userId, response]);
+    return res.json({ id: result.rows[0].id });
+  }catch(err){ console.error('submit survey response error', err); return res.status(500).json({ error: 'Server error' }); }
+});
+
+// Get survey responses (admin only)
+app.get('/survey/:surveyId/responses', async (req, res) => {
+  const surveyId = parseInt(req.params.surveyId, 10);
+  const username = req.query.username;
+  if(!surveyId || !username) return res.status(400).json({ error: 'Missing fields' });
+  const isAdmin = await isAdminUser(username);
+  if(!isAdmin) return res.status(403).json({ error: 'Not authorized' });
+  try{
+    await ensureSurveyResponsesTable();
+    const result = await pool.query('SELECT sr.id, sr.user_id, sr.response, sr.created_at, u.username FROM survey_responses sr LEFT JOIN users u ON sr.user_id = u.id WHERE sr.survey_id = $1 ORDER BY sr.created_at DESC', [surveyId]);
+    return res.json(result.rows);
+  }catch(err){ console.error('get survey responses error', err); return res.status(500).json({ error: 'Server error' }); }
+});
+
+// End a survey (admin only) - users can see responses but can't vote
+app.post('/survey/:surveyId/end', async (req, res) => {
+  const surveyId = parseInt(req.params.surveyId, 10);
+  const { username } = req.body || {};
+  if(!surveyId || !username) return res.status(400).json({ error: 'Missing fields' });
+  const isAdmin = await isAdminUser(username);
+  if(!isAdmin) return res.status(403).json({ error: 'Not authorized' });
+  try{
+    await ensureSurveysTable();
+    const result = await pool.query('UPDATE surveys SET status = $1, ended_at = NOW() WHERE id = $2 RETURNING id, status', ['closed', surveyId]);
+    return res.json({ ended: result.rowCount > 0 });
+  }catch(err){ console.error('end survey error', err); return res.status(500).json({ error: 'Server error' }); }
+});
+
+// Delete a survey (admin only)
+app.post('/survey/:surveyId/delete', async (req, res) => {
+  const surveyId = parseInt(req.params.surveyId, 10);
+  const { username } = req.body || {};
+  if(!surveyId || !username) return res.status(400).json({ error: 'Missing fields' });
+  const isAdmin = await isAdminUser(username);
+  if(!isAdmin) return res.status(403).json({ error: 'Not authorized' });
+  try{
+    await ensureSurveysTable();
+    const r = await pool.query('DELETE FROM surveys WHERE id = $1', [surveyId]);
+    return res.json({ deleted: r.rowCount > 0 });
+  }catch(err){ console.error('delete survey error', err); return res.status(500).json({ error: 'Server error' }); }
 });
 
 const PORT = process.env.PORT || 3000;

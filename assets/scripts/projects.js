@@ -38,17 +38,102 @@
               <div class="vote-count" data-project-id="${slug}">${p.votes || 0}</div>
             </div>
             <button class="btn vote-btn">Voter</button>
+            <button class="btn survey-btn" style="display:none;background:#00d9ff;color:#000;font-weight:700" data-project-slug="${slug}">Répondre au sondage</button>
           </div>
         </article>`;
     }).join('');
     grid.innerHTML = html;
     // signal to other scripts that new projects are rendered
     window.dispatchEvent(new CustomEvent('ecities:projects-rendered'));
+    
+    // Load surveys for each project
+    projects.forEach(p => {
+      loadSurveyForProject(p.slug);
+    });
+    
     return true;
   }
 
   function escapeHtml(str){
     return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[s]));
+  }
+
+  async function loadSurveyForProject(slug){
+    try{
+      const res = await fetch(API_BASE + '/projects/' + encodeURIComponent(slug) + '/survey');
+      if(!res.ok) return;
+      const survey = await res.json();
+      if(!survey) return;
+      // Show survey button for this project
+      const card = document.querySelector(`.project-card[data-project-id="${escapeHtml(slug)}"]`);
+      if(!card) return;
+      const surveyBtn = card.querySelector('.survey-btn');
+      if(surveyBtn){
+        surveyBtn.style.display = '';
+        surveyBtn.addEventListener('click', () => openSurveyModal(slug, survey));
+      }
+    }catch(err){ console.error('loadSurveyForProject error', err); }
+  }
+
+  function openSurveyModal(slug, survey){
+    const user = getUser();
+    if(!user){ 
+      try{ window.EcitiesAuth && window.EcitiesAuth.openModal(); }catch(e){ alert('Veuillez vous connecter'); }
+      return; 
+    }
+
+    const options = Array.isArray(survey.options) ? survey.options : JSON.parse(survey.options || '[]');
+    const isClosed = survey.status !== 'open';
+
+    // Create modal
+    const modal = document.createElement('div');
+    modal.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.65);z-index:2600;padding:16px';
+    modal.innerHTML = `
+      <div style="background:#0b0b0b;border:1px solid rgba(255,212,0,0.08);border-radius:16px;max-width:480px;width:100%;padding:20px;box-shadow:0 18px 48px rgba(0,0,0,0.6)">
+        <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:16px">
+          <div style="color:var(--accent);font-weight:800;font-size:1.1rem">${escapeHtml(survey.question)}</div>
+          <button style="background:transparent;border:1px solid rgba(255,212,0,0.2);color:var(--accent);width:32px;height:32px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>
+        </div>
+        ${isClosed ? `<div style="color:#ffaa00;font-size:0.9rem;margin-bottom:12px">Sondage terminé · Résultats affichés</div>` : ''}
+        <div id="surveyOptions" style="display:flex;flex-direction:column;gap:8px">
+          ${options.map((opt, i) => `
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px;border:1px solid rgba(255,212,0,0.1);border-radius:8px;background:rgba(255,212,0,0.02)">
+              <input type="radio" name="survey-response" value="${escapeHtml(opt)}" ${isClosed ? 'disabled' : ''} style="cursor:pointer">
+              <span style="color:#e9e9e9">${escapeHtml(opt)}</span>
+            </label>
+          `).join('')}
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+          <button class="btn secondary" style="background:transparent;border:1px solid rgba(255,212,0,0.2);color:var(--accent);padding:0.75rem 1.5rem">Annuler</button>
+          ${!isClosed ? `<button class="btn primary" style="background:var(--accent);color:#000;font-weight:800;padding:0.75rem 1.5rem">Répondre</button>` : ''}
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const closeBtn = modal.querySelector('button:nth-of-type(1)');
+    closeBtn.addEventListener('click', () => modal.remove());
+
+    modal.addEventListener('click', (e) => { if(e.target === modal) modal.remove(); });
+
+    if(!isClosed){
+      const submitBtn = modal.querySelector('.btn.primary');
+      submitBtn.addEventListener('click', async () => {
+        const selected = modal.querySelector('input[name="survey-response"]:checked');
+        if(!selected){ alert('Veuillez choisir une option'); return; }
+        try{
+          const res = await fetch(API_BASE + '/survey/' + survey.id + '/response', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ userId: user.id, response: selected.value })
+          });
+          if(!res.ok){ alert('Erreur envoi'); return; }
+          alert('Votre réponse a été enregistrée');
+          modal.remove();
+        }catch(err){ console.error('survey response error', err); alert('Erreur'); }
+      });
+    }
   }
 
   function buildAdminPanel(projects){

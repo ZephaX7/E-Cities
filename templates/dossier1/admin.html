@@ -69,6 +69,12 @@
           </div>
           <div id="ideasProblemsList" style="color:#e9e9e9">Choisissez une catégorie pour afficher les éléments.</div>
         </div>
+
+        <!-- Projects & Surveys Area -->
+        <div id="surveysArea" style="margin-top:2.5rem">
+          <h3 style="color:var(--accent);margin-top:0">Gestion des sondages</h3>
+          <div id="projectsList" style="color:#e9e9e9">Chargement des projets...</div>
+        </div>
       </section>
     </main>
     <script src="../../assets/scripts/i18n.js"></script>
@@ -393,6 +399,182 @@
           }
         }
 
+        // Fetch projects and their surveys
+        async function loadProjects(){
+          try{
+            const res = await fetch(API_BASE + '/projects');
+            if(!res.ok){ document.getElementById('projectsList').innerHTML = '<div style="color:#ffb3b3">Erreur: ' + res.status + '</div>'; return; }
+            const projects = await res.json();
+            if(!projects || projects.length === 0){ document.getElementById('projectsList').innerHTML = '<div style="color:#cfcfcf">Aucun projet</div>'; return; }
+            
+            let html = '';
+            for(const proj of projects){
+              try{
+                const surveyRes = await fetch(API_BASE + '/projects/' + encodeURIComponent(proj.slug) + '/survey');
+                const survey = surveyRes.ok ? await surveyRes.json() : null;
+                
+                html += `
+                  <div class="card" style="margin-bottom:12px;padding:12px;border:1px solid rgba(255,212,0,0.08)">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+                      <div style="flex:1">
+                        <div style="color:var(--accent);font-weight:800">${escapeHtml(proj.title)}</div>
+                        <div style="color:#cfcfcf;font-size:0.9rem;margin-top:4px">${escapeHtml(proj.description || '')}</div>
+                        ${survey ? `
+                          <div style="margin-top:8px;padding:10px;border-left:3px solid #ffaa00;background:rgba(255,170,0,0.1);border-radius:4px">
+                            <div style="color:var(--accent);font-weight:700">Sondage actif</div>
+                            <div style="color:#c7c7c7;font-size:0.9rem">${escapeHtml(survey.question)}</div>
+                            <div style="color:#aaa;font-size:0.85rem;margin-top:4px">Réponses: <strong>${survey.responseCount || 0}</strong></div>
+                            <div style="display:flex;gap:8px;margin-top:8px">
+                              <button class="btn small" data-action="view-responses" data-survey-id="${survey.id}">Voir réponses</button>
+                              <button class="btn small ghost" data-action="end-survey" data-survey-id="${survey.id}">Terminer</button>
+                              <button class="btn small danger" data-action="delete-survey" data-survey-id="${survey.id}">Supprimer</button>
+                            </div>
+                          </div>
+                        ` : `
+                          <div style="margin-top:8px">
+                            <button class="btn small" data-action="create-survey" data-project-slug="${proj.slug}">+ Créer sondage</button>
+                          </div>
+                        `}
+                      </div>
+                    </div>
+                  </div>
+                `;
+              }catch(err){ console.error('Error loading survey for project ' + proj.slug, err); }
+            }
+            
+            document.getElementById('projectsList').innerHTML = html;
+            
+            // Attach event listeners
+            document.querySelectorAll('[data-action="create-survey"]').forEach(btn => btn.addEventListener('click', onCreateSurvey));
+            document.querySelectorAll('[data-action="view-responses"]').forEach(btn => btn.addEventListener('click', onViewResponses));
+            document.querySelectorAll('[data-action="end-survey"]').forEach(btn => btn.addEventListener('click', onEndSurvey));
+            document.querySelectorAll('[data-action="delete-survey"]').forEach(btn => btn.addEventListener('click', onDeleteSurvey));
+          }catch(err){ console.error('load projects', err); document.getElementById('projectsList').innerHTML = '<div style="color:#ffb3b3">Erreur serveur</div>'; }
+        }
+
+        function onCreateSurvey(e){
+          const projectSlug = e.currentTarget.getAttribute('data-project-slug');
+          const modal = createModal(`
+            <div class="modal-header" style="margin-bottom:12px;">
+              <div class="modal-title">Créer un sondage</div>
+            </div>
+            <div>
+              <label style="color:#c7c7c7;display:block;margin-bottom:4px">Question</label>
+              <input type="text" id="surveyQuestion" style="width:100%;padding:0.7rem;border-radius:8px;border:1px solid rgba(255,212,0,0.08);background:transparent;color:#fff;font-size:1rem" placeholder="Votre question...">
+              <label style="color:#c7c7c7;display:block;margin-top:12px;margin-bottom:4px">Options (une par ligne)</label>
+              <textarea id="surveyOptions" rows="4" style="width:100%;padding:0.7rem;border-radius:8px;border:1px solid rgba(255,212,0,0.08);background:transparent;color:#fff;font-size:1rem" placeholder="Option 1&#10;Option 2&#10;Option 3"></textarea>
+              <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+                <button class="btn ghost" id="cancelSurvey">Annuler</button>
+                <button class="btn" id="confirmSurvey" style="background:var(--accent);color:#000;font-weight:800">Créer</button>
+              </div>
+            </div>
+          `, { width:'480px' });
+          modal.querySelector('#cancelSurvey').addEventListener('click', ()=>modal.remove());
+          modal.querySelector('#confirmSurvey').addEventListener('click', async ()=>{
+            const question = modal.querySelector('#surveyQuestion').value.trim();
+            const optionsText = modal.querySelector('#surveyOptions').value.trim();
+            if(!question || !optionsText){ showAdminMsg('Complétez tous les champs'); return; }
+            const options = optionsText.split('\\n').map(o => o.trim()).filter(o => o);
+            if(options.length < 2){ showAdminMsg('Au moins 2 options requises'); return; }
+            try{
+              const res = await fetch(API_BASE + '/projects/' + encodeURIComponent(projectSlug) + '/survey', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ question, options, username: user.username })
+              });
+              if(!res.ok){ showAdminMsg('Erreur création'); return; }
+              showAdminMsg('Sondage créé');
+              modal.remove();
+              loadProjects();
+            }catch(err){ console.error('create survey', err); showAdminMsg('Erreur'); }
+          });
+        }
+
+        function onViewResponses(e){
+          const surveyId = parseInt(e.currentTarget.getAttribute('data-survey-id'), 10);
+          (async ()=>{
+            try{
+              const res = await fetch(API_BASE + '/survey/' + surveyId + '/responses?username=' + encodeURIComponent(user.username));
+              if(!res.ok){ showAdminMsg('Erreur chargement'); return; }
+              const responses = await res.json();
+              const html = responses.length === 0
+                ? '<div style="color:#cfcfcf">Aucune réponse</div>'
+                : responses.map(r => `<div style="padding:8px;border:1px solid rgba(255,212,0,0.06);border-radius:6px;margin-bottom:6px;background:rgba(255,212,0,0.02)"><div style="color:#fff">${escapeHtml(r.response)}</div><div style="color:#aaa;font-size:0.85rem">${r.username || 'Anonyme'} · ${new Date(r.created_at).toLocaleString()}</div></div>`).join('');
+              const modal = createModal(`
+                <div class="modal-header" style="margin-bottom:12px;">
+                  <div class="modal-title">Réponses au sondage</div>
+                </div>
+                <div style="max-height:400px;overflow-y:auto">${html}</div>
+                <div style="display:flex;justify-content:flex-end;margin-top:16px">
+                  <button class="btn ghost" id="closeResponses">Fermer</button>
+                </div>
+              `, { width:'500px' });
+              modal.querySelector('#closeResponses').addEventListener('click', ()=>modal.remove());
+            }catch(err){ console.error('view responses', err); showAdminMsg('Erreur'); }
+          })();
+        }
+
+        function onEndSurvey(e){
+          const surveyId = parseInt(e.currentTarget.getAttribute('data-survey-id'), 10);
+          const modal = createModal(`
+            <div class="modal-header" style="margin-bottom:12px;">
+              <div>
+                <div class="modal-title">Terminer le sondage ?</div>
+                <div class="modal-meta">Les utilisateurs ne pourront plus répondre mais verront les résultats.</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;justify-content:flex-end">
+              <button class="btn ghost" id="cancelEnd">Annuler</button>
+              <button class="btn" id="confirmEnd" style="background:var(--accent);color:#000;font-weight:800">Terminer</button>
+            </div>
+          `, { width:'420px' });
+          modal.querySelector('#cancelEnd').addEventListener('click', ()=>modal.remove());
+          modal.querySelector('#confirmEnd').addEventListener('click', async ()=>{
+            try{
+              const res = await fetch(API_BASE + '/survey/' + surveyId + '/end', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ username: user.username })
+              });
+              if(!res.ok){ showAdminMsg('Erreur'); return; }
+              showAdminMsg('Sondage terminé');
+              modal.remove();
+              loadProjects();
+            }catch(err){ console.error('end survey', err); showAdminMsg('Erreur'); }
+          });
+        }
+
+        function onDeleteSurvey(e){
+          const surveyId = parseInt(e.currentTarget.getAttribute('data-survey-id'), 10);
+          const modal = createModal(`
+            <div class="modal-header" style="margin-bottom:12px;">
+              <div>
+                <div class="modal-title">Supprimer le sondage ?</div>
+                <div class="modal-meta">Cette action est définitive.</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;justify-content:flex-end">
+              <button class="btn ghost" id="cancelDelete">Annuler</button>
+              <button class="btn danger" id="confirmDelete">Supprimer</button>
+            </div>
+          `, { width:'420px' });
+          modal.querySelector('#cancelDelete').addEventListener('click', ()=>modal.remove());
+          modal.querySelector('#confirmDelete').addEventListener('click', async ()=>{
+            try{
+              const res = await fetch(API_BASE + '/survey/' + surveyId + '/delete', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ username: user.username })
+              });
+              if(!res.ok){ showAdminMsg('Erreur suppression'); return; }
+              showAdminMsg('Sondage supprimé');
+              modal.remove();
+              loadProjects();
+            }catch(err){ console.error('delete survey', err); showAdminMsg('Erreur'); }
+          });
+        }
+
+        loadProjects();
         fetchTickets();
       })();
     </script>
