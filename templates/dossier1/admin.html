@@ -243,12 +243,18 @@
                     <div style="color:#9bb0c0;font-size:0.85rem;margin-top:2px">${sender}</div>
                     <div style="margin-top:8px;color:#f5f5f5;white-space:pre-wrap">${escapeHtml(it.content || '')}</div>
                   </div>
-                  <div style="color:#aaa;font-size:0.85rem;white-space:nowrap">${when}</div>
+                  <div style="text-align:right">
+                    <div style="color:#aaa;font-size:0.85rem;white-space:nowrap">${when}</div>
+                    <div style="margin-top:8px">
+                      <button class="btn small danger" data-action="delete-contrib" data-type="${type}" data-id="${it.id}">Supprimer</button>
+                    </div>
+                  </div>
                 </div>
               </div>
             `;
           }).join('');
           contribListEl.innerHTML = out;
+          contribListEl.querySelectorAll('button[data-action="delete-contrib"]').forEach(btn => btn.addEventListener('click', onDeleteContrib));
         }
 
         function setContribTab(tab){
@@ -258,6 +264,35 @@
             problemsBtn.classList.toggle('ghost', tab !== 'problems');
           }
           fetchContrib(tab);
+        }
+
+        function onDeleteContrib(e){
+          const btn = e.currentTarget;
+          const id = btn.getAttribute('data-id');
+          const type = btn.getAttribute('data-type');
+          const modal = createModal(`
+            <div class="modal-header" style="margin-bottom:12px;">
+              <div>
+                <div class="modal-title">Supprimer ${type==='problems'?'le problème':'l\'idée'} ?</div>
+                <div class="modal-meta">Cette action est définitive.</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;justify-content:flex-end">
+              <button class="btn ghost" id="cancelDel">Annuler</button>
+              <button class="btn danger" id="confirmDel">Supprimer</button>
+            </div>
+          `, { width:'420px' });
+          modal.querySelector('#cancelDel').addEventListener('click', ()=>modal.remove());
+          modal.querySelector('#confirmDel').addEventListener('click', async ()=>{
+            try{
+              const path = (type==='problems'? '/problems/':'/ideas/') + encodeURIComponent(id) + '/delete';
+              const res = await fetch(API_BASE + path, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username: user.username }) });
+              if(!res.ok){ showAdminMsg('Erreur suppression'); return; }
+              const data = await res.json();
+              if(data.deleted){ showAdminMsg('Supprimé'); modal.remove(); fetchContrib(currentContribTab); }
+              else showAdminMsg('Élément introuvable');
+            }catch(err){ console.error('delete contrib', err); showAdminMsg('Erreur'); }
+          });
         }
 
         async function onTicketAction(e){

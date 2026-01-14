@@ -773,6 +773,34 @@ app.get('/problems', async (req, res) => {
   }
 });
 
+// Delete an idea (admin only)
+app.post('/ideas/:id/delete', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const { username } = req.body || {};
+  if(!username || !id) return res.status(400).json({ error: 'Missing fields' });
+  const isAdmin = await isAdminUser(username);
+  if(!isAdmin) return res.status(403).json({ error: 'Not authorized' });
+  try{
+    await ensureIdeasTable();
+    const r = await pool.query('DELETE FROM ideas WHERE id = $1', [id]);
+    return res.json({ deleted: r.rowCount > 0 });
+  }catch(err){ console.error('delete idea error', err); return res.status(500).json({ error: 'Server error' }); }
+});
+
+// Delete a problem (admin only)
+app.post('/problems/:id/delete', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const { username } = req.body || {};
+  if(!username || !id) return res.status(400).json({ error: 'Missing fields' });
+  const isAdmin = await isAdminUser(username);
+  if(!isAdmin) return res.status(403).json({ error: 'Not authorized' });
+  try{
+    await ensureProblemsTable();
+    const r = await pool.query('DELETE FROM problems WHERE id = $1', [id]);
+    return res.json({ deleted: r.rowCount > 0 });
+  }catch(err){ console.error('delete problem error', err); return res.status(500).json({ error: 'Server error' }); }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Backend listening on port ${PORT}`));
 
