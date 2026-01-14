@@ -154,16 +154,25 @@
           const API_BASE = (metaApi && metaApi.content) ? metaApi.content.replace(/\/$/, '') : 'http://localhost:3000';
           const submitBtn = document.getElementById('submit-btn');
           submitBtn.disabled = true; submitBtn.textContent = 'Envoi...';
+          
+          const timeout = setTimeout(() => {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Envoyer';
+            showBanner('Le serveur met trop de temps à répondre. Vérifiez la configuration SMTP.', 'error');
+          }, 15000);
+
           fetch(API_BASE + '/contact', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name, email, message })
           }).then(async (res) => {
+            clearTimeout(timeout);
             if(!res.ok){ const data = await res.json().catch(()=>({})); showBanner(data.error || 'Erreur lors de l\'envoi du message', 'error'); return; }
             const data = await res.json().catch(()=>({}));
             if(data.sent){ showBanner('Message envoyé. Merci pour votre contact !', 'success'); form.reset(); }
             else { showBanner('Serveur non configuré pour envoyer des emails (simulation).', 'info'); form.reset(); }
           }).catch((err)=>{
+            clearTimeout(timeout);
             console.error('contact send error', err);
             showBanner('Erreur réseau: impossible d\'envoyer le message', 'error');
           }).finally(()=>{ submitBtn.disabled = false; submitBtn.textContent = 'Envoyer'; });
