@@ -37,8 +37,8 @@
               <div class="vote-label">Nombre de votes :</div>
               <div class="vote-count" data-project-id="${slug}">${p.votes || 0}</div>
             </div>
-            <button class="btn vote-btn">Voter</button>
-            <button class="btn survey-btn" style="display:none;background:#00d9ff;color:#000;font-weight:700" data-project-slug="${slug}">Répondre au sondage</button>
+            <button class="btn vote-btn" style="width:100%">Voter</button>
+            <button class="btn survey-btn" style="display:none;width:100%;background:#00d9ff;color:#000;font-weight:800" data-project-slug="${slug}">Répondre au sondage</button>
           </div>
         </article>`;
     }).join('');
@@ -58,6 +58,44 @@
     return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[s]));
   }
 
+  // site-styled popup for survey actions
+  function showSurveyPopup(message, type='info', autoClose=3800){
+    let p = document.getElementById('siteSurveyPopup');
+    if(!p){
+      p = document.createElement('div');
+      p.id = 'siteSurveyPopup';
+      p.className = 'site-popup';
+      p.innerHTML = '<div class="sp-row"><div class="sp-icon" aria-hidden>📊</div><div class="sp-text"></div><button class="sp-close" aria-label="Fermer">✕</button></div>';
+      document.body.appendChild(p);
+      p.querySelector('.sp-close').addEventListener('click', ()=>{ p.classList.remove('show'); });
+    }
+    p.className = 'site-popup ' + (type||'info');
+    p.querySelector('.sp-text').textContent = message;
+    p.classList.add('show');
+    if(autoClose){ clearTimeout(p._t); p._t = setTimeout(()=>{ p.classList.remove('show'); }, autoClose); }
+  }
+
+  function confirmSurvey(message){
+    return new Promise(resolve => {
+      const overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.65);display:flex;align-items:center;justify-content:center;z-index:2602;padding:16px';
+      overlay.innerHTML = `
+        <div style="background:#0b0b0b;border:1px solid rgba(255,212,0,0.08);border-radius:14px;max-width:420px;width:100%;padding:20px;box-shadow:0 18px 48px rgba(0,0,0,0.6)">
+          <div style="color:var(--accent);font-weight:800;font-size:1.05rem;margin-bottom:10px">Confirmation</div>
+          <div style="color:#e9e9e9;margin-bottom:16px">${escapeHtml(message)}</div>
+          <div style="display:flex;gap:10px;justify-content:flex-end">
+            <button class="btn secondary" style="flex:1;padding:0.85rem;border:1px solid rgba(255,212,0,0.25);background:transparent;color:var(--accent);font-weight:700">Annuler</button>
+            <button class="btn danger" style="flex:1;padding:0.85rem">Confirmer</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+      const [cancelBtn, okBtn] = overlay.querySelectorAll('button');
+      cancelBtn.addEventListener('click', ()=>{ overlay.remove(); resolve(false); });
+      okBtn.addEventListener('click', ()=>{ overlay.remove(); resolve(true); });
+      overlay.addEventListener('click', (e)=>{ if(e.target === overlay){ overlay.remove(); resolve(false); } });
+    });
+  }
+
   async function loadSurveyForProject(slug){
     try{
       const res = await fetch(API_BASE + '/projects/' + encodeURIComponent(slug) + '/survey');
@@ -70,6 +108,7 @@
       const surveyBtn = card.querySelector('.survey-btn');
       if(surveyBtn){
         surveyBtn.style.display = '';
+        if(survey.status !== 'open') surveyBtn.textContent = 'Voir les résultats du sondage';
         surveyBtn.addEventListener('click', () => openSurveyModal(slug, survey));
       }
     }catch(err){ console.error('loadSurveyForProject error', err); }
@@ -77,35 +116,42 @@
 
   function openSurveyModal(slug, survey){
     const user = getUser();
-    if(!user){ 
-      try{ window.EcitiesAuth && window.EcitiesAuth.openModal(); }catch(e){ alert('Veuillez vous connecter'); }
+    const isClosed = survey.status !== 'open';
+    if(!user && !isClosed){ 
+      try{ window.EcitiesAuth && window.EcitiesAuth.openModal(); }catch(e){ showSurveyPopup('Veuillez vous connecter pour répondre.', 'info'); }
       return; 
     }
 
     const options = Array.isArray(survey.options) ? survey.options : JSON.parse(survey.options || '[]');
-    const isClosed = survey.status !== 'open';
+    const counts = survey.counts || {};
 
     // Create modal
     const modal = document.createElement('div');
     modal.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.65);z-index:2600;padding:16px';
     modal.innerHTML = `
-      <div style="background:#0b0b0b;border:1px solid rgba(255,212,0,0.08);border-radius:16px;max-width:480px;width:100%;padding:20px;box-shadow:0 18px 48px rgba(0,0,0,0.6)">
+      <div style="background:#0b0b0b;border:1px solid rgba(255,212,0,0.08);border-radius:16px;max-width:520px;width:100%;padding:22px;box-shadow:0 18px 48px rgba(0,0,0,0.6)">
         <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:16px">
           <div style="color:var(--accent);font-weight:800;font-size:1.1rem">${escapeHtml(survey.question)}</div>
           <button style="background:transparent;border:1px solid rgba(255,212,0,0.2);color:var(--accent);width:32px;height:32px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>
         </div>
         ${isClosed ? `<div style="color:#ffaa00;font-size:0.9rem;margin-bottom:12px">Sondage terminé · Résultats affichés</div>` : ''}
         <div id="surveyOptions" style="display:flex;flex-direction:column;gap:8px">
-          ${options.map((opt, i) => `
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px;border:1px solid rgba(255,212,0,0.1);border-radius:8px;background:rgba(255,212,0,0.02)">
-              <input type="radio" name="survey-response" value="${escapeHtml(opt)}" ${isClosed ? 'disabled' : ''} style="cursor:pointer">
-              <span style="color:#e9e9e9">${escapeHtml(opt)}</span>
-            </label>
-          `).join('')}
+          ${options.map((opt) => {
+            const count = counts[opt] || 0;
+            return `
+              <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;padding:12px;border:1px solid rgba(255,212,0,0.1);border-radius:10px;background:rgba(255,212,0,0.03)">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <input type="radio" name="survey-response" value="${escapeHtml(opt)}" ${isClosed ? 'disabled' : ''} style="cursor:pointer;width:18px;height:18px">
+                  <span style="color:#e9e9e9;font-size:1rem">${escapeHtml(opt)}</span>
+                </div>
+                <span style="color:#ffd400;font-weight:800;font-size:0.95rem">${count} vote${count>1?'s':''}</span>
+              </label>
+            `;
+          }).join('')}
         </div>
-        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
-          <button class="btn secondary" style="background:transparent;border:1px solid rgba(255,212,0,0.2);color:var(--accent);padding:0.75rem 1.5rem">Annuler</button>
-          ${!isClosed ? `<button class="btn primary" style="background:var(--accent);color:#000;font-weight:800;padding:0.75rem 1.5rem">Répondre</button>` : ''}
+        <div style="display:flex;gap:12px;justify-content:space-between;margin-top:18px">
+          <button class="btn secondary" style="flex:1;padding:0.95rem;border:1px solid rgba(255,212,0,0.25);background:transparent;color:var(--accent);font-weight:800">Annuler</button>
+          ${!isClosed ? `<button class="btn primary" style="flex:1;padding:0.95rem;background:var(--accent);color:#000;font-weight:800">Répondre</button>` : ''}
         </div>
       </div>
     `;
@@ -121,17 +167,17 @@
       const submitBtn = modal.querySelector('.btn.primary');
       submitBtn.addEventListener('click', async () => {
         const selected = modal.querySelector('input[name="survey-response"]:checked');
-        if(!selected){ alert('Veuillez choisir une option'); return; }
+        if(!selected){ showSurveyPopup('Veuillez choisir une option', 'info'); return; }
         try{
           const res = await fetch(API_BASE + '/survey/' + survey.id + '/response', {
             method: 'POST',
             headers: {'Content-Type':'application/json'},
             body: JSON.stringify({ userId: user.id, response: selected.value })
           });
-          if(!res.ok){ alert('Erreur envoi'); return; }
-          alert('Votre réponse a été enregistrée');
+          if(!res.ok){ showSurveyPopup('Erreur lors de l\'envoi', 'error'); return; }
+          showSurveyPopup('Votre réponse a été enregistrée', 'success');
           modal.remove();
-        }catch(err){ console.error('survey response error', err); alert('Erreur'); }
+        }catch(err){ console.error('survey response error', err); showSurveyPopup('Erreur serveur', 'error'); }
       });
     }
   }
@@ -142,7 +188,7 @@
       const survey = res.ok ? await res.json() : null;
       
       const user = getUser();
-      if(!user || user.role !== 'Admin'){ alert('Accès admin requis'); return; }
+      if(!user || user.role !== 'Admin'){ showSurveyPopup('Accès admin requis', 'error'); return; }
 
       if(!survey){
         // No survey yet - offer to create
@@ -151,7 +197,7 @@
         // Survey exists - offer to view, end, or delete
         openSurveyActionsModal(slug, survey);
       }
-    }catch(err){ console.error('openSurveyManager error', err); alert('Erreur'); }
+    }catch(err){ console.error('openSurveyManager error', err); showSurveyPopup('Erreur serveur', 'error'); }
   }
 
   function openCreateSurveyModal(slug){
@@ -183,9 +229,9 @@
     createBtn.addEventListener('click', async () => {
       const question = modal.querySelector('#surveyQuestion').value.trim();
       const optionsText = modal.querySelector('#surveyOptions').value.trim();
-      if(!question || !optionsText){ alert('Complétez tous les champs'); return; }
+      if(!question || !optionsText){ showSurveyPopup('Complétez tous les champs', 'info'); return; }
       const options = optionsText.split('\n').map(o => o.trim()).filter(o => o);
-      if(options.length < 2){ alert('Au moins 2 options requises'); return; }
+      if(options.length < 2){ showSurveyPopup('Au moins 2 options requises', 'info'); return; }
       
       try{
         const user = getUser();
@@ -194,14 +240,14 @@
           headers: {'Content-Type':'application/json'},
           body: JSON.stringify({ question, options, username: user.username })
         });
-        if(!res.ok){ alert('Erreur création'); return; }
-        alert('Sondage créé');
+        if(!res.ok){ showSurveyPopup('Erreur lors de la création', 'error'); return; }
+        showSurveyPopup('Sondage créé', 'success');
         modal.remove();
         // Refresh admin panel
         const projects = await fetchProjects();
         buildAdminPanel(projects);
         renderCards(projects);
-      }catch(err){ console.error('create survey error', err); alert('Erreur'); }
+      }catch(err){ console.error('create survey error', err); showSurveyPopup('Erreur serveur', 'error'); }
     });
   }
 
@@ -242,7 +288,7 @@
     modal.querySelector('#viewBtn').addEventListener('click', async () => {
       try{
         const res = await fetch(API_BASE + '/survey/' + survey.id + '/responses?username=' + encodeURIComponent(user.username));
-        if(!res.ok){ alert('Erreur chargement'); return; }
+        if(!res.ok){ showSurveyPopup('Erreur de chargement des réponses', 'error'); return; }
         const responses = await res.json();
         const html = responses.length === 0
           ? '<div style="color:#cfcfcf;padding:12px">Aucune réponse</div>'
@@ -261,41 +307,43 @@
         `;
         document.body.appendChild(respModal);
         respModal.querySelector('#closeResp').addEventListener('click', () => respModal.remove());
-      }catch(err){ console.error('view responses error', err); alert('Erreur'); }
+      }catch(err){ console.error('view responses error', err); showSurveyPopup('Erreur serveur', 'error'); }
     });
     
     modal.querySelector('#endBtn').addEventListener('click', async () => {
-      if(!confirm('Terminer le sondage ? Les utilisateurs ne pourront plus répondre.')) return;
+      const ok = await confirmSurvey('Terminer le sondage ? Les utilisateurs ne pourront plus répondre.');
+      if(!ok) return;
       try{
         const res = await fetch(API_BASE + '/survey/' + survey.id + '/end', {
           method: 'POST',
           headers: {'Content-Type':'application/json'},
           body: JSON.stringify({ username: user.username })
         });
-        if(!res.ok){ alert('Erreur'); return; }
-        alert('Sondage terminé');
+        if(!res.ok){ showSurveyPopup('Erreur lors de la clôture', 'error'); return; }
+        showSurveyPopup('Sondage terminé', 'success');
         modal.remove();
         const projects = await fetchProjects();
         buildAdminPanel(projects);
         renderCards(projects);
-      }catch(err){ console.error('end survey error', err); alert('Erreur'); }
+      }catch(err){ console.error('end survey error', err); showSurveyPopup('Erreur serveur', 'error'); }
     });
     
     modal.querySelector('#deleteBtn').addEventListener('click', async () => {
-      if(!confirm('Supprimer complètement le sondage ? Cette action est définitive.')) return;
+      const ok = await confirmSurvey('Supprimer complètement le sondage ? Cette action est définitive.');
+      if(!ok) return;
       try{
         const res = await fetch(API_BASE + '/survey/' + survey.id + '/delete', {
           method: 'POST',
           headers: {'Content-Type':'application/json'},
           body: JSON.stringify({ username: user.username })
         });
-        if(!res.ok){ alert('Erreur suppression'); return; }
-        alert('Sondage supprimé');
+        if(!res.ok){ showSurveyPopup('Erreur suppression', 'error'); return; }
+        showSurveyPopup('Sondage supprimé', 'success');
         modal.remove();
         const projects = await fetchProjects();
         buildAdminPanel(projects);
         renderCards(projects);
-      }catch(err){ console.error('delete survey error', err); alert('Erreur'); }
+      }catch(err){ console.error('delete survey error', err); showSurveyPopup('Erreur serveur', 'error'); }
     });
   }
 
@@ -431,7 +479,7 @@
     try{
       const user = getUser();
       const res = await fetch(API_BASE + '/projects', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username: user && user.username, ...p }) });
-      if(!res.ok){ alert('Erreur création projet'); return false; }
+      if(!res.ok){ showSurveyPopup('Erreur création projet', 'error'); return false; }
       return true;
     }catch(err){ console.error('createProject error', err); return false; }
   }
@@ -441,7 +489,7 @@
       const payload = { ...p };
       if(!payload.end_date) payload.end_date = null;
       const res = await fetch(API_BASE + '/projects/' + encodeURIComponent(slug), { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username: user && user.username, ...payload }) });
-      if(!res.ok){ alert('Erreur mise à jour'); return false; }
+      if(!res.ok){ showSurveyPopup('Erreur mise à jour', 'error'); return false; }
       return true;
     }catch(err){ console.error('updateProject error', err); return false; }
   }
@@ -449,7 +497,7 @@
     try{
       const user = getUser();
       const res = await fetch(API_BASE + '/projects/' + encodeURIComponent(slug), { method:'DELETE', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username: user && user.username }) });
-      if(!res.ok){ alert('Erreur suppression'); return false; }
+      if(!res.ok){ showSurveyPopup('Erreur suppression', 'error'); return false; }
       return true;
     }catch(err){ console.error('deleteProject error', err); return false; }
   }

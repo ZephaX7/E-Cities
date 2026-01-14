@@ -852,16 +852,23 @@ app.post('/projects/:projectId/survey', async (req, res) => {
   }catch(err){ console.error('create survey error', err); return res.status(500).json({ error: 'Server error' }); }
 });
 
-// Get survey for a project (all users)
+// Get latest survey for a project (open or closed) with aggregated counts
 app.get('/projects/:projectId/survey', async (req, res) => {
   const projectId = req.params.projectId;
   if(!projectId) return res.status(400).json({ error: 'Missing projectId' });
   try{
     await ensureSurveysTable();
-    const result = await pool.query('SELECT id, project_id, question, options, status, created_at, ended_at FROM surveys WHERE project_id = $1 AND status = $2 LIMIT 1', [projectId, 'open']);
+    await ensureSurveyResponsesTable();
+    const result = await pool.query('SELECT id, project_id, question, options, status, created_at, ended_at FROM surveys WHERE project_id = $1 ORDER BY created_at DESC LIMIT 1', [projectId]);
     if(result.rowCount === 0) return res.json(null);
     const survey = result.rows[0];
     survey.options = JSON.parse(survey.options || '[]');
+
+    // Aggregate counts per response
+    const countsRes = await pool.query('SELECT response, COUNT(*)::int AS cnt FROM survey_responses WHERE survey_id = $1 GROUP BY response', [survey.id]);
+    const countsMap = {};
+    countsRes.rows.forEach(r => { countsMap[r.response] = r.cnt; });
+    survey.counts = countsMap;
     return res.json(survey);
   }catch(err){ console.error('get survey error', err); return res.status(500).json({ error: 'Server error' }); }
 });
