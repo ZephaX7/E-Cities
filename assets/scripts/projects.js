@@ -159,7 +159,9 @@
     document.body.appendChild(modal);
 
     const closeBtn = modal.querySelector('button:nth-of-type(1)');
-    closeBtn.addEventListener('click', () => modal.remove());
+    if(closeBtn) closeBtn.addEventListener('click', () => modal.remove());
+    const cancelBtn = modal.querySelector('.btn.secondary');
+    if(cancelBtn) cancelBtn.addEventListener('click', () => modal.remove());
 
     modal.addEventListener('click', (e) => { if(e.target === modal) modal.remove(); });
 

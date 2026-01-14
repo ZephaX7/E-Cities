@@ -173,6 +173,7 @@ body{margin:0;font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, '
 }
 
 .vote-btn{padding:.5rem 1rem;font-weight:700;border-radius:10px}
+.survey-btn{padding:.5rem 1rem;font-weight:800;border-radius:10px}
 
 /* vote counter pill */
 .vote-count{display:inline-flex;align-items:center;gap:.45rem;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,0.03);color:var(--muted);border:1px solid rgba(255,255,255,0.04);min-width:44px;justify-content:center;font-weight:700}
