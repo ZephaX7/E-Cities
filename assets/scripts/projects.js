@@ -136,6 +136,169 @@
     }
   }
 
+  async function openSurveyManager(slug){
+    try{
+      const res = await fetch(API_BASE + '/projects/' + encodeURIComponent(slug) + '/survey');
+      const survey = res.ok ? await res.json() : null;
+      
+      const user = getUser();
+      if(!user || user.role !== 'Admin'){ alert('Accès admin requis'); return; }
+
+      if(!survey){
+        // No survey yet - offer to create
+        openCreateSurveyModal(slug);
+      } else {
+        // Survey exists - offer to view, end, or delete
+        openSurveyActionsModal(slug, survey);
+      }
+    }catch(err){ console.error('openSurveyManager error', err); alert('Erreur'); }
+  }
+
+  function openCreateSurveyModal(slug){
+    const modal = document.createElement('div');
+    modal.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.65);z-index:2600;padding:16px';
+    modal.innerHTML = `
+      <div style="background:#0b0b0b;border:1px solid rgba(255,212,0,0.08);border-radius:16px;max-width:500px;width:100%;padding:24px;box-shadow:0 18px 48px rgba(0,0,0,0.6)">
+        <div style="color:var(--accent);font-weight:800;font-size:1.1rem;margin-bottom:16px">Créer un sondage</div>
+        <div style="margin-bottom:12px">
+          <label style="color:#c7c7c7;display:block;margin-bottom:4px;font-weight:600">Question *</label>
+          <input type="text" id="surveyQuestion" style="width:100%;padding:0.7rem;border-radius:8px;border:1px solid rgba(255,212,0,0.08);background:transparent;color:#fff" placeholder="Votre question...">
+        </div>
+        <div style="margin-bottom:16px">
+          <label style="color:#c7c7c7;display:block;margin-bottom:4px;font-weight:600">Options (une par ligne) *</label>
+          <textarea id="surveyOptions" rows="4" style="width:100%;padding:0.7rem;border-radius:8px;border:1px solid rgba(255,212,0,0.08);background:transparent;color:#fff;font-family:monospace" placeholder="Option 1\nOption 2\nOption 3"></textarea>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn secondary" id="cancelBtn">Annuler</button>
+          <button class="btn" id="createBtn" style="background:var(--accent);color:#000;font-weight:800">Créer</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    const cancelBtn = modal.querySelector('#cancelBtn');
+    cancelBtn.addEventListener('click', () => modal.remove());
+
+    const createBtn = modal.querySelector('#createBtn');
+    createBtn.addEventListener('click', async () => {
+      const question = modal.querySelector('#surveyQuestion').value.trim();
+      const optionsText = modal.querySelector('#surveyOptions').value.trim();
+      if(!question || !optionsText){ alert('Complétez tous les champs'); return; }
+      const options = optionsText.split('\n').map(o => o.trim()).filter(o => o);
+      if(options.length < 2){ alert('Au moins 2 options requises'); return; }
+      
+      try{
+        const user = getUser();
+        const res = await fetch(API_BASE + '/projects/' + encodeURIComponent(slug) + '/survey', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ question, options, username: user.username })
+        });
+        if(!res.ok){ alert('Erreur création'); return; }
+        alert('Sondage créé');
+        modal.remove();
+        // Refresh admin panel
+        const projects = await fetchProjects();
+        buildAdminPanel(projects);
+        renderCards(projects);
+      }catch(err){ console.error('create survey error', err); alert('Erreur'); }
+    });
+  }
+
+  async function openSurveyActionsModal(slug, survey){
+    // Load response count
+    const user = getUser();
+    let responseCount = 0;
+    try{
+      const res = await fetch(API_BASE + '/survey/' + survey.id + '/responses?username=' + encodeURIComponent(user.username));
+      if(res.ok){
+        const responses = await res.json();
+        responseCount = responses.length;
+      }
+    }catch(err){ console.error('fetch response count error', err); }
+
+    const modal = document.createElement('div');
+    modal.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.65);z-index:2600;padding:16px';
+    modal.innerHTML = `
+      <div style="background:#0b0b0b;border:1px solid rgba(255,212,0,0.08);border-radius:16px;max-width:500px;width:100%;padding:24px;box-shadow:0 18px 48px rgba(0,0,0,0.6)">
+        <div style="color:var(--accent);font-weight:800;font-size:1.1rem;margin-bottom:12px">Sondage actif</div>
+        <div style="color:#c7c7c7;margin-bottom:4px">Question: <strong style="color:#fff">${escapeHtml(survey.question)}</strong></div>
+        <div style="color:#aaa;font-size:0.9rem;margin-bottom:16px">Réponses: <strong>${responseCount}</strong></div>
+        <div style="margin-bottom:16px;padding:12px;border:1px solid rgba(255,212,0,0.06);border-radius:8px;background:rgba(255,212,0,0.02);max-height:200px;overflow-y:auto">
+          ${survey.options && Array.isArray(survey.options) ? survey.options.map(o => `<div style="color:#e9e9e9;padding:4px">${escapeHtml(o)}</div>`).join('') : ''}
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+          <button class="btn secondary" id="viewBtn">Voir réponses</button>
+          <button class="btn secondary" id="endBtn">Terminer</button>
+          <button class="btn danger" id="deleteBtn">Supprimer</button>
+          <button class="btn ghost" id="closeBtn">Fermer</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    modal.querySelector('#closeBtn').addEventListener('click', () => modal.remove());
+    
+    modal.querySelector('#viewBtn').addEventListener('click', async () => {
+      try{
+        const res = await fetch(API_BASE + '/survey/' + survey.id + '/responses?username=' + encodeURIComponent(user.username));
+        if(!res.ok){ alert('Erreur chargement'); return; }
+        const responses = await res.json();
+        const html = responses.length === 0
+          ? '<div style="color:#cfcfcf;padding:12px">Aucune réponse</div>'
+          : responses.map(r => `<div style="padding:8px;border:1px solid rgba(255,212,0,0.06);border-radius:6px;margin-bottom:6px;background:rgba(255,212,0,0.02)"><div style="color:#fff">${escapeHtml(r.response)}</div><div style="color:#aaa;font-size:0.85rem">${r.username || 'Anonyme'} · ${new Date(r.created_at).toLocaleString()}</div></div>`).join('');
+        
+        const respModal = document.createElement('div');
+        respModal.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.65);z-index:2601;padding:16px';
+        respModal.innerHTML = `
+          <div style="background:#0b0b0b;border:1px solid rgba(255,212,0,0.08);border-radius:16px;max-width:500px;width:100%;padding:24px;max-height:70vh;overflow-y:auto;box-shadow:0 18px 48px rgba(0,0,0,0.6)">
+            <div style="color:var(--accent);font-weight:800;font-size:1.1rem;margin-bottom:16px">Réponses au sondage</div>
+            <div>${html}</div>
+            <div style="display:flex;justify-content:flex-end;margin-top:16px">
+              <button class="btn ghost" id="closeResp">Fermer</button>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(respModal);
+        respModal.querySelector('#closeResp').addEventListener('click', () => respModal.remove());
+      }catch(err){ console.error('view responses error', err); alert('Erreur'); }
+    });
+    
+    modal.querySelector('#endBtn').addEventListener('click', async () => {
+      if(!confirm('Terminer le sondage ? Les utilisateurs ne pourront plus répondre.')) return;
+      try{
+        const res = await fetch(API_BASE + '/survey/' + survey.id + '/end', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ username: user.username })
+        });
+        if(!res.ok){ alert('Erreur'); return; }
+        alert('Sondage terminé');
+        modal.remove();
+        const projects = await fetchProjects();
+        buildAdminPanel(projects);
+        renderCards(projects);
+      }catch(err){ console.error('end survey error', err); alert('Erreur'); }
+    });
+    
+    modal.querySelector('#deleteBtn').addEventListener('click', async () => {
+      if(!confirm('Supprimer complètement le sondage ? Cette action est définitive.')) return;
+      try{
+        const res = await fetch(API_BASE + '/survey/' + survey.id + '/delete', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ username: user.username })
+        });
+        if(!res.ok){ alert('Erreur suppression'); return; }
+        alert('Sondage supprimé');
+        modal.remove();
+        const projects = await fetchProjects();
+        buildAdminPanel(projects);
+        renderCards(projects);
+      }catch(err){ console.error('delete survey error', err); alert('Erreur'); }
+    });
+  }
+
   function buildAdminPanel(projects){
     if(!isAdmin()) return;
     const section = document.querySelector('section.container.section');
@@ -169,11 +332,12 @@
     }
     const list = panel.querySelector('#projList');
     list.innerHTML = (projects || []).map(p => `
-      <div class="card" data-slug="${escapeHtml(p.slug)}" style="padding:.8rem;margin:.4rem 0;display:grid;grid-template-columns:2fr 3fr 2fr 2fr auto;gap:.6rem;align-items:center">
+      <div class="card" data-slug="${escapeHtml(p.slug)}" style="padding:.8rem;margin:.4rem 0;display:grid;grid-template-columns:2fr 3fr 2fr 2fr 1.5fr auto;gap:.6rem;align-items:center">
         <div><strong>${escapeHtml(p.slug)}</strong></div>
         <div>${escapeHtml(p.title||'')}</div>
         <div>${fmtDateISOToFR(p.end_date)}</div>
         <div>${p.is_active? 'Actif':'Inactif'}</div>
+        <div><button class="btn secondary" data-action="survey" style="width:100%;padding:.5rem">⚙ Sondage</button></div>
         <div style="display:flex;gap:.4rem;justify-content:flex-end">
           <button class="btn secondary" data-action="edit">Modifier</button>
           <button class="btn secondary" data-action="toggle">${p.is_active? 'Désactiver':'Activer'}</button>
@@ -198,6 +362,8 @@
           await refresh();
         } else if(action === 'edit'){
           openEditRow(row, slug);
+        } else if(action === 'survey'){
+          openSurveyManager(slug);
         }
       });
     });
