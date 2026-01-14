@@ -56,6 +56,19 @@
           <h3 style="color:var(--accent);margin-top:0">Tickets utilisateurs</h3>
           <div id="ticketsList" style="margin-top:0.8rem;color:#e9e9e9">Chargement...</div>
         </div>
+
+        <!-- Ideas & Problems Area (admins only) -->
+        <div id="ideasProblemsArea" style="margin-top:2.5rem">
+          <h3 style="color:var(--accent);margin-top:0">Contributions citoyennes</h3>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:0.8rem">
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button id="btnIdeas" class="btn small">Idées</button>
+              <button id="btnProblems" class="btn small">Problèmes signalés</button>
+            </div>
+            <button id="btnRefreshContrib" class="btn small ghost" style="margin-left:auto">↻ Actualiser</button>
+          </div>
+          <div id="ideasProblemsList" style="color:#e9e9e9">Choisissez une catégorie pour afficher les éléments.</div>
+        </div>
       </section>
     </main>
     <script src="../../assets/scripts/i18n.js"></script>
@@ -78,6 +91,21 @@
         const statsGrid = document.getElementById('statsGrid');
         const listEl = document.getElementById('ticketsList');
         const refreshStatsBtn = document.getElementById('refreshStatsBtn');
+        const ideasBtn = document.getElementById('btnIdeas');
+        const problemsBtn = document.getElementById('btnProblems');
+        const refreshContribBtn = document.getElementById('btnRefreshContrib');
+        const contribListEl = document.getElementById('ideasProblemsList');
+        let currentContribTab = 'ideas';
+
+        function escapeHtml(str){
+          if(!str && str !== 0) return '';
+          return String(str)
+            .replace(/&/g,'&amp;')
+            .replace(/</g,'&lt;')
+            .replace(/>/g,'&gt;')
+            .replace(/"/g,'&quot;')
+            .replace(/'/g,'&#39;');
+        }
 
         // Stat card template
         function createStatCard(title, value, icon = '📊', color = '#ffd400') {
@@ -122,6 +150,11 @@
 
         // Initial load
         loadStats();
+        setContribTab('ideas');
+
+        if(ideasBtn) ideasBtn.addEventListener('click', ()=> setContribTab('ideas'));
+        if(problemsBtn) problemsBtn.addEventListener('click', ()=> setContribTab('problems'));
+        if(refreshContribBtn) refreshContribBtn.addEventListener('click', ()=> fetchContrib(currentContribTab));
 
         async function fetchTickets(){
           try{
@@ -174,6 +207,56 @@
         }
 
         function showAdminMsg(msg){ const el = document.createElement('div'); el.className='page-banner info'; el.textContent = msg; document.body.appendChild(el); setTimeout(()=>el.remove(), 2400); }
+
+        async function fetchContrib(type){
+          const path = type === 'problems' ? '/problems' : '/ideas';
+          try{
+            const res = await fetch(API_BASE + path + '?username=' + encodeURIComponent(user.username));
+            if(!res.ok){
+              showAdminMsg('Erreur lors du chargement des ' + (type==='problems'?'problèmes':'idées'));
+              return;
+            }
+            const data = await res.json();
+            const items = type === 'problems' ? (data.problems || []) : (data.ideas || []);
+            renderContrib(items, type);
+          }catch(err){
+            console.error('fetch contrib error', err);
+            showAdminMsg('Impossible de contacter le serveur');
+          }
+        }
+
+        function renderContrib(items, type){
+          if(!contribListEl) return;
+          if(!items || items.length === 0){
+            contribListEl.innerHTML = '<div style="color:#ddd">Aucun ' + (type==='problems'?'problème signalé':'idée') + '</div>';
+            return;
+          }
+          const out = items.map(it => {
+            const when = it.created_at ? new Date(it.created_at).toLocaleString() : '';
+            return `
+              <div class="card" style="margin-bottom:10px;padding:12px;border:1px solid rgba(255,212,0,0.08)">
+                <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
+                  <div style="flex:1;min-width:0">
+                    <div style="color:var(--accent);font-weight:800">${type==='problems'?'Problème':'Idée'}</div>
+                    <div style="color:#cfcfcf;font-size:0.9rem;margin-top:4px">${escapeHtml(it.address || '')}</div>
+                    <div style="margin-top:8px;color:#f5f5f5;white-space:pre-wrap">${escapeHtml(it.content || '')}</div>
+                  </div>
+                  <div style="color:#aaa;font-size:0.85rem;white-space:nowrap">${when}</div>
+                </div>
+              </div>
+            `;
+          }).join('');
+          contribListEl.innerHTML = out;
+        }
+
+        function setContribTab(tab){
+          currentContribTab = tab;
+          if(ideasBtn && problemsBtn){
+            ideasBtn.classList.toggle('ghost', tab !== 'ideas');
+            problemsBtn.classList.toggle('ghost', tab !== 'problems');
+          }
+          fetchContrib(tab);
+        }
 
         async function onTicketAction(e){
           const btn = e.currentTarget; const id = btn.getAttribute('data-id'); const action = btn.getAttribute('data-action');
