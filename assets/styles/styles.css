@@ -128,6 +128,7 @@ body{margin:0;font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, '
 .page-banner.show{transform:translateY(0);opacity:1;pointer-events:auto}
 .page-banner.error{background:rgba(180,20,20,0.95);color:#fff}
 .page-banner.info{background:rgba(40,40,40,0.95);color:#ffd400}
+.page-banner.success{background:rgba(20,140,60,0.95);color:#fff}
 
 /* Hero actions: center CTA and supporting links */
 .hero-actions{display:flex;flex-direction:column;align-items:center;gap:1rem;margin-top:1.5rem}

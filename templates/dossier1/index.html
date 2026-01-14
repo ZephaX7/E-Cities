@@ -147,6 +147,8 @@
           // Submit to backend without leaving the page
           const metaApi = document.querySelector('meta[name="api-base"]');
           const API_BASE = (metaApi && metaApi.content) ? metaApi.content.replace(/\/$/, '') : 'http://localhost:3000';
+          const submitBtn = document.getElementById('submit-btn');
+          submitBtn.disabled = true; submitBtn.textContent = 'Envoi...';
           fetch(API_BASE + '/contact', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -159,7 +161,7 @@
           }).catch((err)=>{
             console.error('contact send error', err);
             showBanner('Erreur réseau: impossible d\'envoyer le message', 'error');
-          });
+          }).finally(()=>{ submitBtn.disabled = false; submitBtn.textContent = 'Envoyer'; });
         });
       })();
     </script>
