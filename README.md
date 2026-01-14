@@ -1,4 +1,4 @@
-# E-cities (clone)
+# E-cities
 
 Arborescence de projet créée pour le travail local.
 

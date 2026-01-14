@@ -63,6 +63,7 @@ CREATE TABLE IF NOT EXISTS ideas (
   id SERIAL PRIMARY KEY,
   address TEXT NOT NULL,
   content TEXT NOT NULL,
+  sender_username TEXT,
   created_at TIMESTAMP DEFAULT NOW()
 );
 
@@ -71,6 +72,7 @@ CREATE TABLE IF NOT EXISTS problems (
   id SERIAL PRIMARY KEY,
   address TEXT NOT NULL,
   content TEXT NOT NULL,
+  sender_username TEXT,
   created_at TIMESTAMP DEFAULT NOW()
 );
 

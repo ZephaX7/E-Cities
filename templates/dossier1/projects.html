@@ -420,6 +420,8 @@
         const metaApi = document.querySelector('meta[name="api-base"]');
         const API_BASE = (metaApi && metaApi.content) ? metaApi.content.replace(/\/$/, '') : 'http://localhost:3000';
 
+        function getUser(){ try { return JSON.parse(localStorage.getItem('ecities_user')||'null'); } catch(e){ return null; } }
+
         // Show banner for feedback (bottom of page like vote banner)
         function showPopup(message, type='info', autoClose=3800){
           let b = document.getElementById('submitBanner');
@@ -442,9 +444,16 @@
             e.preventDefault();
             const address = document.getElementById('ideaAddress').value.trim();
             const content = document.getElementById('ideaContent').value.trim();
+            const user = getUser();
             
             if(!address || !content){
               showPopup('Veuillez remplir tous les champs', 'error');
+              return;
+            }
+
+            if(!user || !user.username){
+              showPopup('Connectez-vous pour proposer une idée', 'error');
+              try{ window.EcitiesAuth && window.EcitiesAuth.openModal(); }catch(e){}
               return;
             }
 
@@ -452,7 +461,7 @@
               const res = await fetch(API_BASE + '/ideas', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ address, content })
+                body: JSON.stringify({ address, content, username: user.username })
               });
 
               if(!res.ok){
@@ -478,9 +487,16 @@
             e.preventDefault();
             const address = document.getElementById('problemAddress').value.trim();
             const content = document.getElementById('problemContent').value.trim();
+            const user = getUser();
             
             if(!address || !content){
               showPopup('Veuillez remplir tous les champs', 'error');
+              return;
+            }
+
+            if(!user || !user.username){
+              showPopup('Connectez-vous pour signaler un problème', 'error');
+              try{ window.EcitiesAuth && window.EcitiesAuth.openModal(); }catch(e){}
               return;
             }
 
@@ -488,7 +504,7 @@
               const res = await fetch(API_BASE + '/problems', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ address, content })
+                body: JSON.stringify({ address, content, username: user.username })
               });
 
               if(!res.ok){

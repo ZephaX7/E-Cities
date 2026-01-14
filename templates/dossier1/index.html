@@ -96,5 +96,58 @@
      <script src="../../assets/scripts/inbox.js"></script>
     <script src="../../assets/scripts/chatbot.js"></script>
     <script src="../../assets/scripts/footer.js"></script>
+    <script>
+      (function(){
+        const form = document.getElementById('contactForm');
+        const emailInput = document.getElementById('input-email');
+        const nameInput = document.getElementById('input-name');
+        const msgInput = document.getElementById('input-message');
+
+        function showBanner(msg, type='info'){
+          let b = document.getElementById('contactBanner');
+          if(!b){ b = document.createElement('div'); b.id='contactBanner'; b.className='page-banner'; document.body.appendChild(b); }
+          b.textContent = msg;
+          b.className = 'page-banner ' + type;
+          b.classList.add('show');
+          clearTimeout(b._t);
+          b._t = setTimeout(()=> b.classList.remove('show'), 4200);
+        }
+
+        function isValidEmail(email){
+          if(!email) return false;
+          const basic = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+          if(!basic.test(email)) return false;
+          // Disallow obvious placeholders like "test" to éviter les faux emails
+          if(/test/i.test(email)) return false;
+          return true;
+        }
+
+        function hasInsults(text){
+          if(!text) return false;
+          const lower = text.toLowerCase();
+          const bad = [
+            'con ', ' con', 'connard', 'connasse', 'fdp', 'fils de pute', 'pute', 'salope', 'batard', 'encule', 'enfoire', 'merde', 'bouffon', 'gros naze', 'abruti', 'crétin', 'idiot'
+          ];
+          return bad.some(w => lower.includes(w));
+        }
+
+        form?.addEventListener('submit', (e)=>{
+          e.preventDefault();
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (msgInput?.value || '').trim();
+
+          if(!name || !email || !message){ showBanner('Veuillez remplir tous les champs', 'error'); return; }
+          if(!isValidEmail(email)){ showBanner('Veuillez saisir un email valide', 'error'); return; }
+          if(hasInsults(name) || hasInsults(message)){ showBanner('Le mail ne peut pas être envoyé car il contient des propos insultants.', 'error'); return; }
+
+          const subject = encodeURIComponent('Contact E-cities - ' + name);
+          const body = encodeURIComponent('De : ' + name + '\nEmail : ' + email + '\n\nMessage :\n' + message);
+          const mailto = `mailto:ecities5@gmail.com?subject=${subject}&body=${body}`;
+          window.location.href = mailto;
+          showBanner('Ouverture de votre client mail…', 'info');
+        });
+      })();
+    </script>
    </body>
  </html>

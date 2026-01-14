@@ -678,9 +678,11 @@ async function ensureIdeasTable(){
         id SERIAL PRIMARY KEY,
         address TEXT NOT NULL,
         content TEXT NOT NULL,
+        sender_username TEXT,
         created_at TIMESTAMP DEFAULT NOW()
       )
     `);
+    await pool.query("ALTER TABLE ideas ADD COLUMN IF NOT EXISTS sender_username TEXT");
   }catch(err){ console.error('ensureIdeasTable error', err); }
 }
 
@@ -692,21 +694,23 @@ async function ensureProblemsTable(){
         id SERIAL PRIMARY KEY,
         address TEXT NOT NULL,
         content TEXT NOT NULL,
+        sender_username TEXT,
         created_at TIMESTAMP DEFAULT NOW()
       )
     `);
+    await pool.query("ALTER TABLE problems ADD COLUMN IF NOT EXISTS sender_username TEXT");
   }catch(err){ console.error('ensureProblemsTable error', err); }
 }
 
 // Submit an idea
 app.post('/ideas', async (req, res) => {
-  const { address, content } = req.body || {};
-  if(!address || !content) return res.status(400).json({ error: 'Missing address or content' });
+  const { address, content, username } = req.body || {};
+  if(!address || !content || !username) return res.status(400).json({ error: 'Missing address, content or username' });
   try{
     await ensureIdeasTable();
     const result = await pool.query(
-      'INSERT INTO ideas (address, content) VALUES ($1, $2) RETURNING id, created_at',
-      [address, content]
+      'INSERT INTO ideas (address, content, sender_username) VALUES ($1, $2, $3) RETURNING id, created_at',
+      [address, content, username]
     );
     return res.status(201).json({ success: true, id: result.rows[0].id, created_at: result.rows[0].created_at });
   }catch(err){
@@ -717,13 +721,13 @@ app.post('/ideas', async (req, res) => {
 
 // Submit a problem
 app.post('/problems', async (req, res) => {
-  const { address, content } = req.body || {};
-  if(!address || !content) return res.status(400).json({ error: 'Missing address or content' });
+  const { address, content, username } = req.body || {};
+  if(!address || !content || !username) return res.status(400).json({ error: 'Missing address, content or username' });
   try{
     await ensureProblemsTable();
     const result = await pool.query(
-      'INSERT INTO problems (address, content) VALUES ($1, $2) RETURNING id, created_at',
-      [address, content]
+      'INSERT INTO problems (address, content, sender_username) VALUES ($1, $2, $3) RETURNING id, created_at',
+      [address, content, username]
     );
     return res.status(201).json({ success: true, id: result.rows[0].id, created_at: result.rows[0].created_at });
   }catch(err){
@@ -741,7 +745,7 @@ app.get('/ideas', async (req, res) => {
   try{
     await ensureIdeasTable();
     const result = await pool.query(
-      'SELECT id, address, content, created_at FROM ideas ORDER BY created_at DESC'
+      'SELECT id, address, content, sender_username, created_at FROM ideas ORDER BY created_at DESC'
     );
     return res.json({ ideas: result.rows });
   }catch(err){
@@ -759,7 +763,7 @@ app.get('/problems', async (req, res) => {
   try{
     await ensureProblemsTable();
     const result = await pool.query(
-      'SELECT id, address, content, created_at FROM problems ORDER BY created_at DESC'
+      'SELECT id, address, content, sender_username, created_at FROM problems ORDER BY created_at DESC'
     );
     return res.json({ problems: result.rows });
   }catch(err){
