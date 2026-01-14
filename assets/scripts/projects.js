@@ -149,9 +149,9 @@
             `;
           }).join('')}
         </div>
-        <div style="display:flex;gap:12px;justify-content:space-between;margin-top:18px">
-          <button class="btn secondary" style="flex:1;padding:0.95rem;border:1px solid rgba(255,212,0,0.25);background:transparent;color:var(--accent);font-weight:800">Annuler</button>
-          ${!isClosed ? `<button class="btn primary" style="flex:1;padding:0.95rem;background:var(--accent);color:#000;font-weight:800">Répondre</button>` : ''}
+        <div style="display:flex;gap:12px;align-items:center;margin-top:18px">
+          <button class="btn secondary" style="flex:1;min-height:56px;padding:1rem;border:1px solid rgba(255,212,0,0.25);background:transparent;color:var(--accent);font-weight:800;border-radius:12px">Annuler</button>
+          ${!isClosed ? `<button class="btn primary" style="flex:1;min-height:56px;padding:1rem;background:var(--accent);color:#000;font-weight:800;border-radius:12px">Répondre</button>` : ''}
         </div>
       </div>
     `;
