@@ -954,54 +954,42 @@ app.post('/contact', async (req, res) => {
   if(hasInsults(name) || hasInsults(message)) return res.status(400).json({ error: 'Insulting content blocked' });
 
   try{
-    const SMTP_HOST = process.env.SMTP_HOST || 'smtp.gmail.com';
-    const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587', 10);
-    const SMTP_USER = process.env.SMTP_USER;
-    const SMTP_PASS = process.env.SMTP_PASS;
+    const BREVO_API_KEY = process.env.BREVO_API_KEY;
     const TO_EMAIL = process.env.CONTACT_TO || 'ecities5@gmail.com';
 
-    if(!SMTP_USER || !SMTP_PASS){
-      console.warn('SMTP not configured; simulating send');
+    if(!BREVO_API_KEY){
+      console.warn('BREVO_API_KEY not configured; simulating send');
       return res.json({ sent:false, simulated:true });
     }
 
-    console.log('[CONTACT] Attempting SMTP connection:', { host: SMTP_HOST, port: SMTP_PORT, user: SMTP_USER });
-
-    const transporter = nodemailer.createTransport({
-      host: SMTP_HOST,
-      port: SMTP_PORT,
-      secure: SMTP_PORT === 465,
-      auth: { user: SMTP_USER, pass: SMTP_PASS },
-      connectionTimeout: 10000,
-      greetingTimeout: 10000,
-      logger: true,
-      debug: true
+    console.log('[CONTACT] Sending via Brevo API...');
+    
+    const brevoResponse = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'api-key': BREVO_API_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        sender: { name: 'E-Cities', email: TO_EMAIL },
+        to: [{ email: TO_EMAIL }],
+        replyTo: { email: email, name: name },
+        subject: `Contact E-cities - ${name}`,
+        textContent: `Nouveau message de contact E-Cities\n\nNom : ${name}\nEmail : ${email}\n\nMessage :\n${message}`
+      })
     });
 
-    // Verify connection first
-    console.log('[CONTACT] Verifying SMTP connection...');
-    await transporter.verify();
-    console.log('[CONTACT] SMTP connection verified successfully');
+    if(!brevoResponse.ok){
+      const errorData = await brevoResponse.json().catch(() => ({}));
+      console.error('[CONTACT] Brevo API error:', errorData);
+      return res.status(500).json({ error: 'Email sending failed' });
+    }
 
-    console.log('[CONTACT] Sending email...');
-    await transporter.sendMail({
-      from: `E-Cities <${SMTP_USER}>`,
-      replyTo: `${name} <${email}>`,
-      to: TO_EMAIL,
-      subject: `Contact E-cities - ${name}`,
-      text: `Nouveau message de contact E-Cities\n\nNom : ${name}\nEmail : ${email}\n\nMessage :\n${message}`
-    });
-
-    console.log('[CONTACT] Email sent successfully');
+    const data = await brevoResponse.json();
+    console.log('[CONTACT] Email sent successfully via Brevo:', data);
     return res.json({ sent:true });
   }catch(err){
-    console.error('[CONTACT] Error details:', {
-      message: err.message,
-      code: err.code,
-      command: err.command,
-      response: err.response,
-      responseCode: err.responseCode
-    });
+    console.error('[CONTACT] Error:', err.message);
     return res.status(500).json({ error: 'Email sending failed: ' + (err.message || 'Unknown error') });
   }
 });
