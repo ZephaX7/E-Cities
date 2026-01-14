@@ -10,6 +10,137 @@
     <link rel="shortcut icon" href="../../assets/images/favicon.svg">
     <title>Projets Citoyens — E-cities</title>
     <link rel="stylesheet" href="../../assets/styles/styles.css">
+    <style>
+      /* Modals styling */
+      dialog.modal {
+        border: 1px solid rgba(255, 212, 0, 0.08);
+        background: #0b0b0b;
+        border-radius: 16px;
+        padding: 0;
+        box-shadow: 0 18px 48px rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(8px);
+        max-width: 520px;
+        width: 100%;
+        z-index: 2600;
+      }
+      
+      dialog.modal::backdrop {
+        background: rgba(0, 0, 0, 0.65);
+        z-index: 2599;
+      }
+      
+      dialog.modal form {
+        display: flex;
+        flex-direction: column;
+      }
+      
+      .modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1.25rem;
+        border-bottom: 1px solid rgba(255, 212, 0, 0.08);
+        gap: 12px;
+      }
+      
+      .modal-header h3 {
+        margin: 0;
+        color: var(--accent);
+        font-size: 1.1rem;
+        font-weight: 800;
+      }
+      
+      .modal-close {
+        background: transparent;
+        border: 1px solid rgba(255, 212, 0, 0.2);
+        color: var(--accent);
+        width: 32px;
+        height: 32px;
+        border-radius: 6px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 160ms ease;
+      }
+      
+      .modal-close:hover {
+        background: rgba(255, 212, 0, 0.08);
+        border-color: rgba(255, 212, 0, 0.3);
+      }
+      
+      .modal-body {
+        padding: 1.25rem;
+      }
+      
+      .form-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        color: rgba(255, 212, 0, 0.7);
+        font-weight: 600;
+        font-size: 0.95rem;
+      }
+      
+      .form-group {
+        margin-bottom: 1rem;
+      }
+      
+      .form-group:last-of-type {
+        margin-bottom: 0;
+      }
+      
+      .form-group input,
+      .form-group textarea {
+        width: 100%;
+        padding: 0.75rem;
+        border: 1px solid rgba(255, 212, 0, 0.15);
+        border-radius: 8px;
+        background: rgba(10, 14, 21, 0.8);
+        color: #fff;
+        font-family: inherit;
+        transition: border-color 160ms ease;
+      }
+      
+      .form-group input:focus,
+      .form-group textarea:focus {
+        outline: none;
+        border-color: rgba(255, 212, 0, 0.4);
+        box-shadow: 0 0 0 3px rgba(255, 212, 0, 0.08);
+      }
+      
+      .form-group textarea {
+        resize: vertical;
+        min-height: 120px;
+      }
+      
+      .modal-footer {
+        display: flex;
+        gap: 1rem;
+        justify-content: flex-end;
+        padding: 1.25rem;
+        border-top: 1px solid rgba(255, 212, 0, 0.08);
+      }
+      
+      .modal-footer .btn {
+        padding: 0.75rem 1.5rem;
+        font-size: 0.95rem;
+        border-radius: 10px;
+        margin: 0;
+        width: auto;
+        max-width: none;
+      }
+      
+      .modal-footer .btn.secondary {
+        background: transparent;
+        border: 1px solid rgba(255, 212, 0, 0.2);
+        color: var(--accent);
+      }
+      
+      .modal-footer .btn.secondary:hover {
+        background: rgba(255, 212, 0, 0.05);
+        border-color: rgba(255, 212, 0, 0.3);
+      }
+    </style>
   </head>
   <body>
     <header class="top">
@@ -45,11 +176,63 @@
       </section>
 
       <section class="container section boxed">
+        <div style="display: flex; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap;">
+          <button id="proposeIdeasBtn" class="btn primary">Proposer une idée</button>
+          <button id="reportProblemBtn" class="btn primary">Signaler un problème</button>
+        </div>
         <h2 id="projects-section-title">Projets en cours</h2>
         <p>Ci-dessous une sélection de projets actifs. Cliquez sur un projet pour voir plus de détails.</p>
         <div class="cards projects-cards" style="margin-top:1.5rem"></div>
 
       </section>
+
+      <!-- Modal for proposing an idea -->
+      <dialog id="ideaModal" class="modal">
+        <form id="ideaForm" method="dialog">
+          <div class="modal-header">
+            <h3>Proposer une idée</h3>
+            <button type="button" class="modal-close" onclick="document.getElementById('ideaModal').close()">✕</button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label for="ideaAddress">Adresse *</label>
+              <input type="text" id="ideaAddress" name="address" placeholder="ex: 123 Rue de la Paix" required>
+            </div>
+            <div class="form-group">
+              <label for="ideaContent">Votre idée *</label>
+              <textarea id="ideaContent" name="content" placeholder="Décrivez votre idée..." required></textarea>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn secondary" onclick="document.getElementById('ideaModal').close()">Annuler</button>
+            <button type="submit" class="btn primary">Soumettre</button>
+          </div>
+        </form>
+      </dialog>
+
+      <!-- Modal for reporting a problem -->
+      <dialog id="problemModal" class="modal">
+        <form id="problemForm" method="dialog">
+          <div class="modal-header">
+            <h3>Signaler un problème</h3>
+            <button type="button" class="modal-close" onclick="document.getElementById('problemModal').close()">✕</button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label for="problemAddress">Adresse *</label>
+              <input type="text" id="problemAddress" name="address" placeholder="ex: 456 Avenue de la République" required>
+            </div>
+            <div class="form-group">
+              <label for="problemContent">Description du problème *</label>
+              <textarea id="problemContent" name="content" placeholder="Décrivez le problème..." required></textarea>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn secondary" onclick="document.getElementById('problemModal').close()">Annuler</button>
+            <button type="submit" class="btn primary">Soumettre</button>
+          </div>
+        </form>
+      </dialog>
 
       <footer class="footer">
         <div class="container center"> <a href="/templates/dossier1/index.html">Retour à l'accueil</a></div>
@@ -228,6 +411,110 @@
 
         document.addEventListener('DOMContentLoaded', initVoting);
         window.addEventListener('ecities:projects-rendered', initVoting);
+      })();
+    </script>
+
+    <script>
+      // Handle idea and problem submissions
+      (function(){
+        const metaApi = document.querySelector('meta[name="api-base"]');
+        const API_BASE = (metaApi && metaApi.content) ? metaApi.content.replace(/\/$/, '') : 'http://localhost:3000';
+
+        // Show banner for feedback (bottom of page like vote banner)
+        function showPopup(message, type='info', autoClose=3800){
+          let b = document.getElementById('submitBanner');
+          if(!b){
+            b = document.createElement('div');
+            b.id = 'submitBanner';
+            b.className = 'page-banner info';
+            document.body.appendChild(b);
+          }
+          b.textContent = message;
+          b.className = 'page-banner ' + (type||'info');
+          b.classList.add('show');
+          if(autoClose){ clearTimeout(b._t); b._t = setTimeout(()=>{ b.classList.remove('show'); }, autoClose); }
+        }
+
+        // Handle idea form submission
+        const ideaForm = document.getElementById('ideaForm');
+        if(ideaForm){
+          ideaForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const address = document.getElementById('ideaAddress').value.trim();
+            const content = document.getElementById('ideaContent').value.trim();
+            
+            if(!address || !content){
+              showPopup('Veuillez remplir tous les champs', 'error');
+              return;
+            }
+
+            try{
+              const res = await fetch(API_BASE + '/ideas', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ address, content })
+              });
+
+              if(!res.ok){
+                const data = await res.json();
+                showPopup(data.error || 'Erreur lors de la soumission', 'error');
+                return;
+              }
+
+              showPopup('Votre idée a été soumise avec succès!', 'success');
+              ideaForm.reset();
+              document.getElementById('ideaModal').close();
+            }catch(err){
+              console.error('Error submitting idea:', err);
+              showPopup('Erreur réseau: impossible de soumettre l\'idée', 'error');
+            }
+          });
+        }
+
+        // Handle problem form submission
+        const problemForm = document.getElementById('problemForm');
+        if(problemForm){
+          problemForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const address = document.getElementById('problemAddress').value.trim();
+            const content = document.getElementById('problemContent').value.trim();
+            
+            if(!address || !content){
+              showPopup('Veuillez remplir tous les champs', 'error');
+              return;
+            }
+
+            try{
+              const res = await fetch(API_BASE + '/problems', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ address, content })
+              });
+
+              if(!res.ok){
+                const data = await res.json();
+                showPopup(data.error || 'Erreur lors de la soumission', 'error');
+                return;
+              }
+
+              showPopup('Votre signalement a été soumis avec succès!', 'success');
+              problemForm.reset();
+              document.getElementById('problemModal').close();
+            }catch(err){
+              console.error('Error submitting problem:', err);
+              showPopup('Erreur réseau: impossible de soumettre le signalement', 'error');
+            }
+          });
+        }
+
+        // Open modals when buttons are clicked
+        document.getElementById('proposeIdeasBtn')?.addEventListener('click', () => {
+          document.getElementById('ideaModal').showModal();
+        });
+
+        document.getElementById('reportProblemBtn')?.addEventListener('click', () => {
+          document.getElementById('problemModal').showModal();
+        });
       })();
     </script>
   </body>

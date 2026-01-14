@@ -58,6 +58,22 @@ CREATE TABLE IF NOT EXISTS ticket_replies (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
+-- Ideas table
+CREATE TABLE IF NOT EXISTS ideas (
+  id SERIAL PRIMARY KEY,
+  address TEXT NOT NULL,
+  content TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Problems table
+CREATE TABLE IF NOT EXISTS problems (
+  id SERIAL PRIMARY KEY,
+  address TEXT NOT NULL,
+  content TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
 -- Create indexes for better query performance
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 CREATE INDEX IF NOT EXISTS idx_projects_slug ON projects(slug);

@@ -670,6 +670,104 @@ app.get('/inbox/count', async (req, res) => {
   }catch(err){ console.error('inbox count error', err); return res.status(500).json({ error: 'Server error' }); }
 });
 
+// Ensure ideas table exists helper
+async function ensureIdeasTable(){
+  try{
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ideas (
+        id SERIAL PRIMARY KEY,
+        address TEXT NOT NULL,
+        content TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+  }catch(err){ console.error('ensureIdeasTable error', err); }
+}
+
+// Ensure problems table exists helper
+async function ensureProblemsTable(){
+  try{
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS problems (
+        id SERIAL PRIMARY KEY,
+        address TEXT NOT NULL,
+        content TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+  }catch(err){ console.error('ensureProblemsTable error', err); }
+}
+
+// Submit an idea
+app.post('/ideas', async (req, res) => {
+  const { address, content } = req.body || {};
+  if(!address || !content) return res.status(400).json({ error: 'Missing address or content' });
+  try{
+    await ensureIdeasTable();
+    const result = await pool.query(
+      'INSERT INTO ideas (address, content) VALUES ($1, $2) RETURNING id, created_at',
+      [address, content]
+    );
+    return res.status(201).json({ success: true, id: result.rows[0].id, created_at: result.rows[0].created_at });
+  }catch(err){
+    console.error('POST /ideas error', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Submit a problem
+app.post('/problems', async (req, res) => {
+  const { address, content } = req.body || {};
+  if(!address || !content) return res.status(400).json({ error: 'Missing address or content' });
+  try{
+    await ensureProblemsTable();
+    const result = await pool.query(
+      'INSERT INTO problems (address, content) VALUES ($1, $2) RETURNING id, created_at',
+      [address, content]
+    );
+    return res.status(201).json({ success: true, id: result.rows[0].id, created_at: result.rows[0].created_at });
+  }catch(err){
+    console.error('POST /problems error', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Get all ideas (admin only)
+app.get('/ideas', async (req, res) => {
+  const username = req.query.username;
+  if(!username) return res.status(400).json({ error: 'Missing username' });
+  const isAdmin = await isAdminUser(username);
+  if(!isAdmin) return res.status(403).json({ error: 'Not authorized' });
+  try{
+    await ensureIdeasTable();
+    const result = await pool.query(
+      'SELECT id, address, content, created_at FROM ideas ORDER BY created_at DESC'
+    );
+    return res.json({ ideas: result.rows });
+  }catch(err){
+    console.error('GET /ideas error', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Get all problems (admin only)
+app.get('/problems', async (req, res) => {
+  const username = req.query.username;
+  if(!username) return res.status(400).json({ error: 'Missing username' });
+  const isAdmin = await isAdminUser(username);
+  if(!isAdmin) return res.status(403).json({ error: 'Not authorized' });
+  try{
+    await ensureProblemsTable();
+    const result = await pool.query(
+      'SELECT id, address, content, created_at FROM problems ORDER BY created_at DESC'
+    );
+    return res.json({ problems: result.rows });
+  }catch(err){
+    console.error('GET /problems error', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Backend listening on port ${PORT}`));
 
