@@ -985,7 +985,8 @@ app.post('/contact', async (req, res) => {
     return res.json({ sent:true });
   }catch(err){
     console.error('contact send error', err);
-    return res.status(500).json({ error: 'Server error' });
+    console.error('SMTP details:', { host: process.env.SMTP_HOST, port: process.env.SMTP_PORT, user: process.env.SMTP_USER });
+    return res.status(500).json({ error: 'Email sending failed: ' + (err.message || 'Unknown error') });
   }
 });
 
