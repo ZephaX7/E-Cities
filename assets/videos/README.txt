@@ -1,1 +1,0 @@
-Place your .mp4 video files in this folder (assets/videos).
