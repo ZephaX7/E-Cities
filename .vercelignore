@@ -1,0 +1,8 @@
+main.go
+go.mod
+backend/
+src/
+**/.git/
+.gitignore
+*.md
+Truc\ a\ faire.txt
